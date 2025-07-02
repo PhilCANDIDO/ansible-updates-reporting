@@ -1,0 +1,32 @@
+---
+- name: "(generate_host_report) Create temporary directory for host reports"
+  tempfile:
+    state: directory
+    suffix: "_updates_report"
+  register: temp_host_report_dir
+  delegate_to: localhost
+  tags: [generation, temp]
+
+- name: "(generate_host_report) Generate JSON report for this host"
+  template:
+    src: host_report.json.j2
+    dest: "{{ temp_host_report_dir.path }}/{{ inventory_hostname }}.json"
+  delegate_to: localhost
+  tags: [generation, json]
+
+- name: "(generate_host_report) Upload host report to repository manager"
+  copy:
+    src: "{{ temp_host_report_dir.path }}/{{ inventory_hostname }}.json"
+    dest: "{{ repository_base_path }}/json/current/{{ inventory_hostname }}.json"
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0644'
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  tags: [generation, upload]
+
+- name: "(generate_host_report) Cleanup temporary files"
+  file:
+    path: "{{ temp_host_report_dir.path }}"
+    state: absent
+  delegate_to: localhost
+  tags: [generation, cleanup]

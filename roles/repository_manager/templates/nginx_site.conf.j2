@@ -1,0 +1,55 @@
+server {
+    listen 80;
+    server_name {{ ansible_fqdn }} {{ ansible_hostname }};
+    
+    root {{ repository_base_path }};
+    index index.html;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    
+    # Disable server tokens
+    server_tokens {{ webserver_security.server_tokens | lower }};
+    
+    # Client max body size
+    client_max_body_size {{ webserver_security.client_max_body_size }};
+    
+    # Main location
+    location / {
+        try_files $uri $uri/ =404;
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+    }
+    
+    # JSON files with proper content type
+    location ~* \.json$ {
+        add_header Content-Type application/json;
+        add_header Access-Control-Allow-Origin "*";
+    }
+    
+    # Excel files
+    location ~* \.xlsx?$ {
+        add_header Content-Type application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;
+        add_header Content-Disposition "attachment";
+    }
+    
+    # HTML reports with security headers
+    location ~* \.html$ {
+        add_header Content-Type text/html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    
+    # Logging
+    {% if webserver_security.access_log %}
+    access_log /var/log/nginx/updates-reports.access.log;
+    {% else %}
+    access_log off;
+    {% endif %}
+    
+    {% if webserver_security.error_log %}
+    error_log /var/log/nginx/updates-reports.error.log;
+    {% endif %}
+}

@@ -1,0 +1,46 @@
+---
+- name: "(collect_redhat_updates) Check if yum or dnf is available"
+  command: which {{ item }}
+  register: package_manager_check
+  failed_when: false
+  changed_when: false
+  loop:
+    - dnf
+    - yum
+  tags: [redhat, package_manager]
+
+- name: "(collect_redhat_updates) Set package manager"
+  set_fact:
+    redhat_package_manager: "{{ 'dnf' if package_manager_check.results[0].rc == 0 else 'yum' }}"
+  tags: [redhat, package_manager]
+
+- name: "(collect_redhat_updates) Get list of available updates"
+  command: "{{ redhat_package_manager }} check-update --quiet"
+  register: redhat_updates_raw
+  changed_when: false
+  failed_when: redhat_updates_raw.rc not in [0, 100]
+  tags: [redhat, package_list]
+
+- name: "(collect_redhat_updates) Get security updates count"
+  shell: |
+    {{ redhat_package_manager }} updateinfo list security --quiet | wc -l
+  register: redhat_security_count
+  changed_when: false
+  failed_when: false
+  tags: [redhat, security_updates]
+
+- name: "(collect_redhat_updates) Parse available updates"
+  set_fact:
+    redhat_updates: "{{ redhat_updates_raw.stdout_lines | default([]) | redhat_parse_updates }}"
+    redhat_security_updates_count: "{{ redhat_security_count.stdout | int }}"
+  tags: [redhat, parsing]
+
+- name: "(collect_redhat_updates) Set collected updates for this host"
+  set_fact:
+    collected_updates:
+      total_count: "{{ redhat_updates | length }}"
+      security_count: "{{ redhat_security_updates_count }}"
+      packages: "{{ redhat_updates }}"
+      collection_method: "{{ redhat_package_manager }}"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+  tags: [redhat, results]

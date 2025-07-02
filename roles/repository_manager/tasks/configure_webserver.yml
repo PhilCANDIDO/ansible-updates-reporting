@@ -1,0 +1,45 @@
+---
+- name: "(configure_webserver) Install webserver packages"
+  package:
+    name: "{{ webserver_packages[webserver_type] }}"
+    state: present
+  tags: [setup, webserver, packages]
+
+- name: "(configure_webserver) Install Python dependencies for Excel generation"
+  pip:
+    name:
+      - openpyxl
+      - pandas
+    state: present
+  tags: [setup, packages, python]
+
+- name: "(configure_webserver) Generate webserver configuration"
+  template:
+    src: "{{ webserver_type }}_site.conf.j2"
+    dest: "{{ webserver_config_path[webserver_type] }}/updates-reports"
+    backup: true
+  notify: "restart {{ webserver_type }}"
+  tags: [setup, webserver, config]
+
+- name: "(configure_webserver) Enable site configuration"
+  file:
+    src: "{{ webserver_config_path[webserver_type] }}/updates-reports"
+    dest: "{{ webserver_enabled_path[webserver_type] }}/updates-reports"
+    state: link
+  notify: "restart {{ webserver_type }}"
+  when: webserver_type == 'nginx'
+  tags: [setup, webserver, config]
+
+- name: "(configure_webserver) Enable Apache site"
+  command: a2ensite updates-reports
+  notify: "restart {{ webserver_type }}"
+  when: webserver_type == 'apache'
+  changed_when: false
+  tags: [setup, webserver, config]
+
+- name: "(configure_webserver) Ensure webserver is started and enabled"
+  service:
+    name: "{{ webserver_service[webserver_type] }}"
+    state: started
+    enabled: true
+  tags: [setup, webserver, service]

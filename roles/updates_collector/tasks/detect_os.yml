@@ -1,0 +1,29 @@
+---
+- name: "(detect_os) Gather OS facts"
+  setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - "distribution"
+      - "distribution_version"
+      - "distribution_major_version"
+      - "os_family"
+  tags: [detection, facts]
+
+- name: "(detect_os) Set OS-specific variables"
+  set_fact:
+    os_detection:
+      family: "{{ ansible_os_family }}"
+      distribution: "{{ ansible_distribution }}"
+      version: "{{ ansible_distribution_version }}"
+      major_version: "{{ ansible_distribution_major_version }}"
+      architecture: "{{ ansible_architecture }}"
+  tags: [detection, variables]
+
+- name: "(detect_os) Validate supported OS"
+  assert:
+    that:
+      - ansible_os_family in ['Debian', 'RedHat', 'Suse']
+    fail_msg: "Unsupported OS family: {{ ansible_os_family }}"
+    success_msg: "OS {{ ansible_distribution }} {{ ansible_distribution_version }} is supported"
+  tags: [detection, validation]

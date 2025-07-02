@@ -1,0 +1,19 @@
+---
+- name: "(report_generator) Include data aggregation tasks"
+  include_tasks: aggregate_data.yml
+  tags: [aggregation, data]
+
+- name: "(report_generator) Include JSON report generation"
+  include_tasks: generate_json.yml
+  when: "'json' in report_formats"
+  tags: [generation, json]
+
+- name: "(report_generator) Include HTML report generation"
+  include_tasks: generate_html.yml
+  when: "'html' in report_formats"
+  tags: [generation, html]
+
+- name: "(report_generator) Include Excel report generation"
+  include_tasks: generate_excel.yml
+  when: "'excel' in report_formats"
+  tags: [generation, excel]

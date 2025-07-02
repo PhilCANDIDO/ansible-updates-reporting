@@ -1,0 +1,29 @@
+---
+- name: "(setup_directories) Create base repository directory"
+  file:
+    path: "{{ repository_base_path }}"
+    state: directory
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0755'
+  tags: [setup, directories]
+
+- name: "(setup_directories) Create report format subdirectories"
+  file:
+    path: "{{ repository_base_path }}/{{ item }}"
+    state: directory
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0755'
+  loop: "{{ report_formats }}"
+  tags: [setup, directories]
+
+- name: "(setup_directories) Create current and archive directories"
+  file:
+    path: "{{ repository_base_path }}/{{ item[1] }}/{{ item[0] }}"
+    state: directory
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0755'
+  loop: "{{ report_formats | product(['current', 'archive']) | list }}"
+  tags: [setup, directories]

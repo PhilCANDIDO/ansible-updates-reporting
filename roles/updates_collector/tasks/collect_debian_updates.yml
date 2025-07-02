@@ -1,0 +1,38 @@
+---
+- name: "(collect_debian_updates) Update package cache"
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [debian, cache_update]
+
+- name: "(collect_debian_updates) Get list of upgradable packages"
+  shell: |
+    apt list --upgradable 2>/dev/null | grep -v '^Listing' | grep -v '^WARNING'
+  register: debian_upgradable_raw
+  changed_when: false
+  failed_when: false
+  tags: [debian, package_list]
+
+- name: "(collect_debian_updates) Get security updates"
+  shell: |
+    apt list --upgradable 2>/dev/null | grep -E '(security|security-updates)' | wc -l
+  register: debian_security_count
+  changed_when: false
+  failed_when: false
+  tags: [debian, security_updates]
+
+- name: "(collect_debian_updates) Parse upgradable packages"
+  set_fact:
+    debian_updates: "{{ debian_upgradable_raw.stdout_lines | default([]) | debian_parse_updates }}"
+    debian_security_updates_count: "{{ debian_security_count.stdout | int }}"
+  tags: [debian, parsing]
+
+- name: "(collect_debian_updates) Set collected updates for this host"
+  set_fact:
+    collected_updates:
+      total_count: "{{ debian_updates | length }}"
+      security_count: "{{ debian_security_updates_count }}"
+      packages: "{{ debian_updates }}"
+      collection_method: "apt"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+  tags: [debian, results]

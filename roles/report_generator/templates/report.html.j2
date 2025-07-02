@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Updates Report - {{ execution_id }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Outlook compatibility styles */
+        .outlook-table { border-collapse: collapse; width: 100%; }
+        .outlook-table td, .outlook-table th { border: 1px solid #e5e7eb; padding: 8px; }
+        @media screen and (max-width: 768px) {
+            .responsive-hide { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-white shadow-sm rounded-lg mb-6 p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">System Updates Report</h1>
+                    <p class="text-gray-600 mt-2">Generated on {{ ansible_date_time.iso8601 }}</p>
+                    <p class="text-sm text-gray-500">Execution ID: {{ execution_id }}</p>
+                </div>
+                <div class="text-right">
+                    <div class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                        {% if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates %}
+                        bg-red-100 text-red-800
+                        {% elif consolidated_data.summary.total_security_updates > 0 %}
+                        bg-yellow-100 text-yellow-800
+                        {% else %}
+                        bg-green-100 text-green-800
+                        {% endif %}">
+                        {% if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates %}
+                        🔴 Critical Priority
+                        {% elif consolidated_data.summary.total_security_updates > 0 %}
+                        🟡 Medium Priority
+                        {% else %}
+                        🟢 Low Priority
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Hosts</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ consolidated_data.summary.total_hosts }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.268 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Updates</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ consolidated_data.summary.total_updates }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-100">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Security Updates</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ consolidated_data.summary.total_security_updates }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Require Reboot</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ consolidated_data.summary.hosts_requiring_reboot }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Host Information -->
+        <div class="bg-white shadow-sm rounded-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900">Host Details</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="outlook-table min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hostname</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OS</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Updates</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Security</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider responsive-hide">Last Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for host in consolidated_data.hosts %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">{{ host.hostname }}</div>
+                                <div class="text-sm text-gray-500">{{ host.ip_address }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">{{ host.distribution }}</div>
+                                <div class="text-sm text-gray-500">{{ host.version }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ host.total_updates }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ host.security_updates }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
+                                    {% if host.security_updates > security_thresholds.critical_updates %}
+                                    bg-red-100 text-red-800
+                                    {% elif host.security_updates > 0 %}
+                                    bg-yellow-100 text-yellow-800
+                                    {% else %}
+                                    bg-green-100 text-green-800
+                                    {% endif %}">
+                                    {% if host.security_updates > security_thresholds.critical_updates %}
+                                    Critical
+                                    {% elif host.security_updates > 0 %}
+                                    Medium
+                                    {% else %}
+                                    Low
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 responsive-hide">
+                                {{ host.collection_timestamp | regex_replace('T.*', '') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-white shadow-sm rounded-lg p-6">
+            <div class="text-center text-sm text-gray-500">
+                <p>Report generated by Ansible Updates Reporting System</p>
+                <p class="mt-1">For technical questions, contact the Operations Team</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print styles -->
+    <style media="print">
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        .shadow-sm { box-shadow: none !important; }
+    </style>
+</body>
+</html>

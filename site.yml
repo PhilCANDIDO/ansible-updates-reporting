@@ -1,0 +1,44 @@
+---
+- name: "Ansible Updates Reporting Pipeline"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    execution_timestamp: "{{ ansible_date_time.epoch }}"
+    execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
+  tasks:
+    - name: "(site) Validate repository manager availability"
+      ping:
+      delegate_to: "{{ groups['repository_managers'][0] }}"
+      tags: [always, validation]
+
+- name: "Setup Repository Manager"
+  hosts: repository_managers
+  gather_facts: true
+  roles:
+    - role: repository_manager
+      tags: [repository, setup]
+
+- name: "Collect Updates Information"
+  hosts: all:!repository_managers
+  gather_facts: true
+  serial: "{{ updates_collection_serial | default('100%') }}"
+  roles:
+    - role: updates_collector
+      tags: [collection, updates]
+
+- name: "Generate Consolidated Reports"
+  hosts: repository_managers
+  gather_facts: true
+  roles:
+    - role: report_generator
+      tags: [reporting, generation]
+
+- name: "Send Notifications"
+  hosts: repository_managers
+  gather_facts: false
+  roles:
+    - role: notification_manager
+      tags: [notification, email]
+  when: 
+    - send_notifications | default(true) | bool
+    - smtp_server is defined

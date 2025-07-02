@@ -1,0 +1,28 @@
+---
+# Repository manager specific configuration
+webserver_packages:
+  nginx:
+    - nginx
+    - python3-pip
+  apache:
+    - apache2
+    - python3-pip
+
+webserver_service:
+  nginx: nginx
+  apache: apache2
+
+webserver_config_path:
+  nginx: "/etc/nginx/sites-available"
+  apache: "/etc/apache2/sites-available"
+
+webserver_enabled_path:
+  nginx: "/etc/nginx/sites-enabled"
+  apache: "/etc/apache2/sites-enabled"
+
+# Web server security
+webserver_security:
+  server_tokens: false
+  client_max_body_size: "10M"
+  access_log: true
+  error_log: true

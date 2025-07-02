@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "report_version": "1.0",
+    "execution_id": "{{ execution_id }}",
+    "collection_timestamp": "{{ collected_updates.collection_timestamp }}",
+    "hostname": "{{ inventory_hostname }}",
+    "fqdn": "{{ ansible_fqdn | default('N/A') }}",
+    "ip_address": "{{ ansible_default_ipv4.address | default('N/A') }}"
+  },
+  "system_info": {
+    "os_family": "{{ os_detection.family }}",
+    "distribution": "{{ os_detection.distribution }}",
+    "version": "{{ os_detection.version }}",
+    "architecture": "{{ os_detection.architecture }}",
+    "kernel": "{{ ansible_kernel | default('N/A') }}",
+    "uptime_seconds": {{ ansible_uptime_seconds | default(0) }}
+  },
+  "updates_summary": {
+    "total_updates": {{ collected_updates.total_count }},
+    "security_updates": {{ collected_updates.security_count }},
+    "critical_level": "{{ 'HIGH' if collected_updates.security_count > security_thresholds.critical_updates else ('MEDIUM' if collected_updates.security_count > 0 else 'LOW') }}",
+    "collection_method": "{{ collected_updates.collection_method }}",
+    "requires_reboot": {{ (collected_updates.packages | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0) | lower }}
+  },
+  "packages": {{ collected_updates.packages | to_nice_json }}
+}

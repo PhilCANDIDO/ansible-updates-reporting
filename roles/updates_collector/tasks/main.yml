@@ -1,0 +1,23 @@
+---
+- name: "(updates_collector) Include OS detection tasks"
+  include_tasks: detect_os.yml
+  tags: [detection, os]
+
+- name: "(updates_collector) Include Debian/Ubuntu updates collection"
+  include_tasks: collect_debian_updates.yml
+  when: ansible_os_family == "Debian"
+  tags: [collection, debian, ubuntu]
+
+- name: "(updates_collector) Include RedHat/CentOS/Rocky/Alma updates collection"
+  include_tasks: collect_redhat_updates.yml
+  when: ansible_os_family == "RedHat"
+  tags: [collection, redhat, centos, rocky, alma]
+
+- name: "(updates_collector) Include SUSE updates collection"
+  include_tasks: collect_suse_updates.yml
+  when: ansible_os_family == "Suse"
+  tags: [collection, suse, opensuse]
+
+- name: "(updates_collector) Include host report generation"
+  include_tasks: generate_host_report.yml
+  tags: [generation, host_report]
