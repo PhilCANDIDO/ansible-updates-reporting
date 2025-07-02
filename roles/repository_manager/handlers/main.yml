@@ -1,3 +1,18 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# handlers file for roles/repository_manager
+- name: "restart nginx"
+  service:
+    name: nginx
+    state: restarted
+  tags: [handlers, webserver]
+
+- name: "restart apache"
+  service:
+    name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    state: restarted
+  tags: [handlers, webserver]
+
+- name: "reload nginx"
+  service:
+    name: nginx
+    state: reloaded
+  tags: [handlers, webserver]

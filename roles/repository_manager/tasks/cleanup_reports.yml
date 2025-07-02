@@ -1,0 +1,108 @@
+---
+- name: "(cleanup_reports) Find old report files to archive"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}/current"
+    age: "{{ repository_retention_days }}d"
+    file_type: file
+    patterns: "*"
+  register: old_reports
+  loop: "{{ report_formats }}"
+  tags: [cleanup, archive, find]
+
+- name: "(cleanup_reports) Create archive directories if needed"
+  file:
+    path: "{{ repository_base_path }}/{{ item }}/archive/{{ ansible_date_time.date }}"
+    state: directory
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0755'
+  loop: "{{ report_formats }}"
+  when: old_reports.results | selectattr('files', 'defined') | selectattr('files', '!=', []) | list | length > 0
+  tags: [cleanup, archive, directories]
+
+- name: "(cleanup_reports) Move old reports to archive"
+  command: >
+    mv "{{ item.1.path }}" 
+    "{{ repository_base_path }}/{{ item.0.item }}/archive/{{ ansible_date_time.date }}/{{ item.1.path | basename }}"
+  loop: "{{ old_reports.results | subelements('files', skip_missing=True) }}"
+  when: 
+    - item.1.path is defined
+    - item.1.age > (repository_retention_days | int * 86400)
+  changed_when: true
+  tags: [cleanup, archive, move]
+
+- name: "(cleanup_reports) Find very old archived reports to delete"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}/archive"
+    age: "{{ (repository_retention_days | int * 3) }}d"
+    file_type: any
+    recurse: true
+  register: very_old_reports
+  loop: "{{ report_formats }}"
+  tags: [cleanup, purge, find]
+
+- name: "(cleanup_reports) Delete very old archived reports"
+  file:
+    path: "{{ item.1.path }}"
+    state: absent
+  loop: "{{ very_old_reports.results | subelements('files', skip_missing=True) }}"
+  when: item.1.path is defined
+  tags: [cleanup, purge, delete]
+
+- name: "(cleanup_reports) Remove empty archive directories"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}/archive"
+    file_type: directory
+    recurse: false
+  register: archive_dirs
+  loop: "{{ report_formats }}"
+  tags: [cleanup, directories, find]
+
+- name: "(cleanup_reports) Check if archive directories are empty"
+  find:
+    paths: "{{ item.1.path }}"
+    file_type: any
+  register: dir_contents
+  loop: "{{ archive_dirs.results | subelements('files', skip_missing=True) }}"
+  when: item.1.path is defined
+  tags: [cleanup, directories, check]
+
+- name: "(cleanup_reports) Remove empty archive directories"
+  file:
+    path: "{{ item.item.1.path }}"
+    state: absent
+  loop: "{{ dir_contents.results }}"
+  when: 
+    - item.matched is defined
+    - item.matched == 0
+    - item.item.1.path is defined
+  tags: [cleanup, directories, remove]
+
+- name: "(cleanup_reports) Generate cleanup summary"
+  set_fact:
+    cleanup_summary:
+      archived_files: "{{ old_reports.results | map(attribute='files') | flatten | length }}"
+      deleted_files: "{{ very_old_reports.results | map(attribute='files') | flatten | length }}"
+      cleanup_date: "{{ ansible_date_time.iso8601 }}"
+      retention_policy: "{{ repository_retention_days }} days"
+  tags: [cleanup, summary]
+
+- name: "(cleanup_reports) Log cleanup summary"
+  debug:
+    msg: |
+      Cleanup Summary:
+      - Files archived: {{ cleanup_summary.archived_files }}
+      - Files deleted: {{ cleanup_summary.deleted_files }}
+      - Cleanup date: {{ cleanup_summary.cleanup_date }}
+      - Retention policy: {{ cleanup_summary.retention_policy }}
+  tags: [cleanup, summary, log]
+
+- name: "(cleanup_reports) Create cleanup log entry"
+  lineinfile:
+    path: "{{ repository_base_path }}/cleanup.log"
+    line: "{{ ansible_date_time.iso8601 }} - Archived: {{ cleanup_summary.archived_files }}, Deleted: {{ cleanup_summary.deleted_files }}"
+    create: true
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0644'
+  tags: [cleanup, logging]

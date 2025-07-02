@@ -1,3 +1,11 @@
-#SPDX-License-Identifier: MIT-0
----
-# defaults file for roles/repository_manager
+# Dans group_vars/all/main.yml (déjà présent)
+repository_retention_days: 30  # Déjà défini
+repository_base_path: "/var/www/reports"  # Déjà défini
+report_formats:  # Déjà défini
+  - json
+  - html
+  - excel
+
+# Variables optionnelles
+webserver_user: "www-data"  # ou nginx selon la distribution
+webserver_group: "www-data"
