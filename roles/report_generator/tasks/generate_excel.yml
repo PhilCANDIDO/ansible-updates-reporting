@@ -14,6 +14,39 @@
   run_once: true
   tags: [generation, excel, dependencies, info]
 
+- name: "(generate_excel) Check control node OS family"
+  setup:
+    gather_subset: "!all,!min,distribution"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, dependencies, os_detection]
+
+- name: "(generate_excel) Display control node OS info"
+  debug:
+    msg: "Control node OS: {{ hostvars['localhost']['ansible_distribution'] }} {{ hostvars['localhost']['ansible_distribution_version'] }}"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, dependencies, info]
+
+- name: "(generate_excel) Fix dpkg interrupted state (Debian/Ubuntu)"
+  command: dpkg --configure -a
+  delegate_to: localhost
+  run_once: true
+  become: true
+  when: hostvars['localhost']['ansible_os_family'] == 'Debian'
+  ignore_errors: true
+  tags: [generation, excel, dependencies, fix]
+
+- name: "(generate_excel) Update package cache (Debian/Ubuntu)"
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+  delegate_to: localhost
+  run_once: true
+  become: true
+  when: hostvars['localhost']['ansible_os_family'] == 'Debian'
+  tags: [generation, excel, dependencies, update]
+
 - name: "(generate_excel) Check if openpyxl is already installed"
   command: python3 -c "import openpyxl; print(openpyxl.__version__)"
   register: openpyxl_check
@@ -32,71 +65,89 @@
   changed_when: false
   tags: [generation, excel, dependencies, check]
 
+- name: "(generate_excel) Check if numpy is already installed"
+  command: python3 -c "import numpy; print(numpy.__version__)"
+  register: numpy_check
+  delegate_to: localhost
+  run_once: true
+  failed_when: false
+  changed_when: false
+  tags: [generation, excel, dependencies, check]
+
 - name: "(generate_excel) Display current package status"
   debug:
     msg: |
       Package status:
       - openpyxl: {{ 'installed (version ' + openpyxl_check.stdout + ')' if openpyxl_check.rc == 0 else 'not installed' }}
       - pandas: {{ 'installed (version ' + pandas_check.stdout + ')' if pandas_check.rc == 0 else 'not installed' }}
+      - numpy: {{ 'installed (version ' + numpy_check.stdout + ')' if numpy_check.rc == 0 else 'not installed' }}
   delegate_to: localhost
   run_once: true
   tags: [generation, excel, dependencies, info]
 
-- name: "(generate_excel) Install Python Excel dependencies via system packages (Debian/Ubuntu)"
-  package:
+- name: "(generate_excel) Install Excel dependencies via system packages (Debian/Ubuntu)"
+  apt:
     name:
       - python3-openpyxl
       - python3-pandas
+      - python3-numpy
+      - liblapack3
+      - libblas3
+      - libatlas-base-dev
     state: present
   delegate_to: localhost
   run_once: true
   become: true
   when: 
-    - ansible_os_family == 'Debian'
-    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - hostvars['localhost']['ansible_os_family'] == 'Debian'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
   register: system_package_install_debian
   tags: [generation, excel, dependencies, install]
 
-- name: "(generate_excel) Install Python Excel dependencies via system packages (RedHat/CentOS)"
-  package:
+- name: "(generate_excel) Install Excel dependencies via system packages (RedHat/CentOS)"
+  yum:
     name:
       - python3-openpyxl
       - python3-pandas
+      - python3-numpy
+      - lapack
+      - blas
     state: present
   delegate_to: localhost
   run_once: true
   become: true
   when: 
-    - ansible_os_family == 'RedHat'
-    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - hostvars['localhost']['ansible_os_family'] == 'RedHat'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
   register: system_package_install_redhat
   ignore_errors: true
   tags: [generation, excel, dependencies, install]
 
-- name: "(generate_excel) Install Python Excel dependencies via EPEL (RedHat/CentOS fallback)"
+- name: "(generate_excel) Install Excel dependencies via pip (RedHat fallback)"
   pip:
     name:
       - openpyxl>=3.0.0
       - pandas>=1.3.0
+      - numpy>=1.21.0
     state: present
     executable: pip3
-    extra_args: "--break-system-packages"
   delegate_to: localhost
   run_once: true
   become: true
   when: 
-    - ansible_os_family == 'RedHat'
-    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - hostvars['localhost']['ansible_os_family'] == 'RedHat'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
     - system_package_install_redhat is defined
     - system_package_install_redhat.failed
   register: pip_install_redhat_fallback
   tags: [generation, excel, dependencies, install]
 
-- name: "(generate_excel) Install Python Excel dependencies via pip with break-system-packages (Last resort)"
+- name: "(generate_excel) Install Excel dependencies via pip (Debian fallback)"
   pip:
     name:
       - openpyxl>=3.0.0
       - pandas>=1.3.0
+      - numpy>=1.21.0
     state: present
     executable: pip3
     extra_args: "--break-system-packages"
@@ -104,19 +155,20 @@
   run_once: true
   become: true
   when: 
-    - ansible_os_family == 'Debian'
-    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - hostvars['localhost']['ansible_os_family'] == 'Debian'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
     - system_package_install_debian is defined
     - system_package_install_debian.failed
   register: pip_install_debian_fallback
   tags: [generation, excel, dependencies, install]
 
 - name: "(generate_excel) Verify dependencies installation"
-  command: python3 -c "import openpyxl; import pandas; print('Dependencies OK - openpyxl:', openpyxl.__version__, 'pandas:', pandas.__version__)"
+  command: python3 -c "import openpyxl; import pandas; import numpy; print('Dependencies OK - openpyxl:', openpyxl.__version__, 'pandas:', pandas.__version__, 'numpy:', numpy.__version__)"
   register: dependencies_verification
   delegate_to: localhost
   run_once: true
   changed_when: false
+  failed_when: false
   tags: [generation, excel, dependencies, verify]
 
 - name: "(generate_excel) Set Excel generation capability flag"
@@ -134,6 +186,7 @@
       {{ dependencies_verification.stdout }}
       {% else %}
       Error: {{ dependencies_verification.stderr | default('Unknown error') }}
+      Will fallback to CSV generation
       {% endif %}
   delegate_to: localhost
   run_once: true
@@ -166,6 +219,7 @@
   run_once: true
   register: excel_generation_result
   when: excel_generation_available | bool
+  failed_when: false
   tags: [generation, excel, execute]
 
 - name: "(generate_excel) Handle Excel generation success"
@@ -176,6 +230,7 @@
       - Dependencies: {{ dependencies_verification.stdout if dependencies_verification.rc == 0 else 'Error' }}
   when: 
     - excel_generation_available | bool
+    - excel_generation_result is defined
     - excel_generation_result.rc == 0
   delegate_to: localhost
   run_once: true
@@ -222,6 +277,7 @@
   debug:
     msg: |
       Excel Report Generation Summary:
+      - Control node OS: {{ hostvars['localhost']['ansible_distribution'] }} {{ hostvars['localhost']['ansible_distribution_version'] }}
       - Excel dependencies available: {{ excel_generation_available | bool }}
       - Generation method: {{ 'Excel (.xlsx)' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'CSV fallback' }}
       - File location: {{ control_node_reports_path }}/excel/
@@ -229,6 +285,5 @@
       - Hosts included: {{ aggregated_data.hosts | length }}
       - Errors included: {{ aggregated_data.errors | length }}
       - Python version: {{ python_version_check.stdout }}
-      - Installation method: {{ 'System packages' if (system_package_install_debian is defined and not system_package_install_debian.failed) or (system_package_install_redhat is defined and not system_package_install_redhat.failed) else 'pip with --break-system-packages' }}
   run_once: true
   tags: [generation, excel, summary]
