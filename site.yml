@@ -5,11 +5,19 @@
   vars:
     execution_timestamp: "{{ ansible_date_time.epoch }}"
     execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
+    # Variable pour contrôler l'utilisation du repository
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
   tasks:
     - name: "(site) Validate repository manager availability"
       ping:
       delegate_to: "{{ groups['repository_managers'][0] }}"
+      when: use_repository_manager | bool
       tags: [always, validation]
+
+    - name: "(site) Display repository manager status"
+      debug:
+        msg: "Repository manager will {{ 'be used' if use_repository_manager else 'NOT be used' }} for this execution"
+      tags: [always, info]
 
 - name: "Setup Repository Manager"
   hosts: repository_managers
@@ -17,28 +25,40 @@
   roles:
     - role: repository_manager
       tags: [repository, setup]
+  when: 
+    - use_repository_manager | default(false) | bool
+    - inventory_hostname in groups['repository_managers']
 
 - name: "Collect Updates Information"
   hosts: all:!repository_managers
   gather_facts: true
   serial: "{{ updates_collection_serial | default('100%') }}"
+  vars:
+    # Transmettre l'information aux rôles
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
   roles:
     - role: updates_collector
       tags: [collection, updates]
 
 - name: "Generate Consolidated Reports"
-  hosts: repository_managers
+  hosts: "{{ 'repository_managers' if use_repository_manager else 'localhost' }}"
   gather_facts: true
+  vars:
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
   roles:
     - role: report_generator
       tags: [reporting, generation]
+  when: use_repository_manager | default(false) | bool
 
 - name: "Send Notifications"
-  hosts: repository_managers
+  hosts: "{{ 'repository_managers' if use_repository_manager else 'localhost' }}"
   gather_facts: false
+  vars:
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
   roles:
     - role: notification_manager
       tags: [notification, email]
   when: 
     - send_notifications | default(true) | bool
     - smtp_server is defined
+    - use_repository_manager | default(false) | bool

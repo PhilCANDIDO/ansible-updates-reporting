@@ -1,0 +1,71 @@
+# Ansible files
+*.retry
+.ansible_cache/
+.ansible_facts/
+
+# Inventory files (contain sensitive host information)
+inventory/*.yml
+inventory/*/*.yml
+inventory/*.ini
+inventory/*/*.ini
+inventory/*.json
+inventory/*/*.json
+!inventory/development/hosts_sample.yml
+
+# Vault passwords
+.vault_pass
+.vault_pass.txt
+vault_pass*
+*.vault
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+*.orig
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+id_dsa*
+
+# Test files
+.molecule/
+.pytest_cache/
+.coverage
+
+# AWX/Tower
+tower-cli.cfg
+.tower_cli.cfg
+
+# Downloaded roles
+galaxy_roles/
+!roles/
+!roles/**
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Custom
+local/
+private/
+secrets/

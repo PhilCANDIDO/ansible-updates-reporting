@@ -1,7 +1,13 @@
 ---
-- name: "(report_generator) Include data aggregation tasks"
+- name: "(report_generator) Include repository-based data aggregation"
   include_tasks: aggregate_data.yml
-  tags: [aggregation, data]
+  when: use_repository_manager | default(false) | bool
+  tags: [aggregation, data, repository]
+
+- name: "(report_generator) Include local data aggregation"
+  include_tasks: aggregate_local_data.yml
+  when: not (use_repository_manager | default(false) | bool)
+  tags: [aggregation, data, local]
 
 - name: "(report_generator) Include JSON report generation"
   include_tasks: generate_json.yml
@@ -17,3 +23,12 @@
   include_tasks: generate_excel.yml
   when: "'excel' in report_formats"
   tags: [generation, excel]
+
+- name: "(report_generator) Display report generation summary"
+  debug:
+    msg: |
+      Report generation completed:
+      - Storage type: {{ 'Repository Manager' if use_repository_manager else 'Local' }}
+      - Formats: {{ report_formats | join(', ') }}
+      - Location: {{ repository_base_path if use_repository_manager else local_reports_path }}
+  tags: [generation, summary]

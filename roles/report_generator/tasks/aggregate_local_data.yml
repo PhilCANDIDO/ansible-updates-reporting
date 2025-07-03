@@ -1,0 +1,49 @@
+---
+- name: "(aggregate_local_data) Find all local JSON reports"
+  find:
+    paths: "{{ local_reports_path }}"
+    patterns: "*.json"
+    file_type: file
+  register: local_json_files
+  delegate_to: localhost
+  tags: [aggregation, local, find]
+
+- name: "(aggregate_local_data) Read local JSON reports"
+  slurp:
+    src: "{{ item.path }}"
+  register: local_reports_content
+  loop: "{{ local_json_files.files }}"
+  delegate_to: localhost
+  tags: [aggregation, local, read]
+
+- name: "(aggregate_local_data) Parse and aggregate local reports"
+  set_fact:
+    parsed_reports: "{{ local_reports_content.results | map(attribute='content') | map('b64decode') | map('from_json') | list }}"
+  tags: [aggregation, local, parse]
+
+- name: "(aggregate_local_data) Calculate consolidated summary"
+  set_fact:
+    consolidated_data:
+      summary:
+        total_hosts: "{{ parsed_reports | length }}"
+        total_updates: "{{ parsed_reports | sum(attribute='updates_summary.total_updates') }}"
+        total_security_updates: "{{ parsed_reports | sum(attribute='updates_summary.security_updates') }}"
+        hosts_requiring_reboot: "{{ parsed_reports | selectattr('updates_summary.requires_reboot', 'equalto', true) | list | length }}"
+        generation_timestamp: "{{ ansible_date_time.iso8601 }}"
+        execution_id: "{{ execution_id }}"
+        storage_type: "local"
+        report_location: "{{ local_reports_path }}"
+      hosts: "{{ parsed_reports | map('extract_host_summary') | list }}"
+      by_os_family: "{{ parsed_reports | groupby('system_info.os_family') | dict }}"
+      critical_hosts: "{{ parsed_reports | selectattr('updates_summary.critical_level', 'equalto', 'HIGH') | list }}"
+  tags: [aggregation, local, summary]
+
+- name: "(aggregate_local_data) Display aggregation summary"
+  debug:
+    msg: |
+      Local aggregation completed:
+      - Total hosts processed: {{ consolidated_data.summary.total_hosts }}
+      - Total updates found: {{ consolidated_data.summary.total_updates }}
+      - Security updates: {{ consolidated_data.summary.total_security_updates }}
+      - Hosts requiring reboot: {{ consolidated_data.summary.hosts_requiring_reboot }}
+  tags: [aggregation, local, info]

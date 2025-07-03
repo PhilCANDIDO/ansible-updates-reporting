@@ -1,32 +1,28 @@
 ---
-- name: "(generate_host_report) Create temporary directory for host reports"
-  tempfile:
+- name: "(generate_local_report) Create local reports directory"
+  file:
+    path: "{{ local_reports_path }}"
     state: directory
-    suffix: "_updates_report"
-  register: temp_host_report_dir
+    mode: '0755'
   delegate_to: localhost
-  tags: [generation, temp]
+  run_once: true
+  tags: [generation, local, setup]
 
-- name: "(generate_host_report) Generate JSON report for this host"
+- name: "(generate_local_report) Generate local JSON report for this host"
   template:
     src: host_report.json.j2
-    dest: "{{ temp_host_report_dir.path }}/{{ inventory_hostname }}.json"
-  delegate_to: localhost
-  tags: [generation, json]
-
-- name: "(generate_host_report) Upload host report to repository manager"
-  copy:
-    src: "{{ temp_host_report_dir.path }}/{{ inventory_hostname }}.json"
-    dest: "{{ repository_base_path }}/json/current/{{ inventory_hostname }}.json"
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    dest: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
     mode: '0644'
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  tags: [generation, upload]
-
-- name: "(generate_host_report) Cleanup temporary files"
-  file:
-    path: "{{ temp_host_report_dir.path }}"
-    state: absent
   delegate_to: localhost
-  tags: [generation, cleanup]
+  tags: [generation, local, json]
+
+- name: "(generate_local_report) Display local report location"
+  debug:
+    msg: "Local report generated at: {{ local_reports_path }}/{{ inventory_hostname }}.json"
+  tags: [generation, local, info]
+
+- name: "(generate_local_report) Set fact for local report path"
+  set_fact:
+    host_report_path: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+    report_storage_type: "local"
+  tags: [generation, local, facts]

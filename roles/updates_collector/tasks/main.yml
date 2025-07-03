@@ -18,6 +18,15 @@
   when: ansible_os_family == "Suse"
   tags: [collection, suse, opensuse]
 
-- name: "(updates_collector) Include host report generation"
+- name: "(updates_collector) Include repository-based host report generation"
   include_tasks: generate_host_report.yml
-  tags: [generation, host_report]
+  when: 
+    - use_repository_manager | default(false) | bool
+    - groups['repository_managers'] is defined
+    - groups['repository_managers'] | length > 0
+  tags: [generation, host_report, repository]
+
+- name: "(updates_collector) Include local host report generation"
+  include_tasks: generate_local_report.yml
+  when: not (use_repository_manager | default(false) | bool)
+  tags: [generation, host_report, local]
