@@ -1,0 +1,23 @@
+---
+- name: "(check_initialization) Check if repository manager is already initialized"
+  stat:
+    path: "{{ repository_base_path }}/.initialized"
+  register: repo_initialized_check
+  tags: [initialization, check]
+
+- name: "(check_initialization) Set initialization status fact"
+  set_fact:
+    repository_already_initialized: "{{ repo_initialized_check.stat.exists }}"
+  tags: [initialization, check]
+
+- name: "(check_initialization) Display initialization status"
+  debug:
+    msg: "Repository manager is {{ 'already initialized' if repository_already_initialized else 'NOT initialized - will proceed with setup' }}"
+  tags: [initialization, info]
+
+- name: "(check_initialization) Skip setup if already initialized"
+  meta: end_play
+  when: 
+    - repository_already_initialized | bool
+    - not force_repository_setup | default(false) | bool
+  tags: [initialization, skip]

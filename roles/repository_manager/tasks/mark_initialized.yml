@@ -1,0 +1,19 @@
+---
+- name: "(mark_initialized) Create initialization marker file"
+  copy:
+    content: |
+      Repository Manager initialized on {{ ansible_date_time.iso8601 }}
+      Initialized by: {{ ansible_user_id }}@{{ ansible_hostname }}
+      Base path: {{ repository_base_path }}
+      Webserver type: {{ webserver_type }}
+      Report formats: {{ report_formats | join(', ') }}
+    dest: "{{ repository_base_path }}/.initialized"
+    owner: "{{ webserver_user | default('www-data') }}"
+    group: "{{ webserver_group | default('www-data') }}"
+    mode: '0644'
+  tags: [initialization, marker]
+
+- name: "(mark_initialized) Display initialization completion"
+  debug:
+    msg: "Repository manager setup completed and marked as initialized"
+  tags: [initialization, info]

@@ -1,11 +1,22 @@
 ---
+- name: "(repository_manager) Include initialization check tasks"
+  include_tasks: check_initialization.yml
+  tags: [initialization, check]
+
 - name: "(repository_manager) Include setup directories tasks"
   include_tasks: setup_directories.yml
+  when: not repository_already_initialized | bool
   tags: [setup, directories]
 
 - name: "(repository_manager) Include webserver configuration tasks"
   include_tasks: configure_webserver.yml
+  when: not repository_already_initialized | bool
   tags: [setup, webserver]
+
+- name: "(repository_manager) Include initialization marker tasks"
+  include_tasks: mark_initialized.yml
+  when: not repository_already_initialized | bool
+  tags: [initialization, marker]
 
 - name: "(repository_manager) Include cleanup tasks"
   include_tasks: cleanup_reports.yml
