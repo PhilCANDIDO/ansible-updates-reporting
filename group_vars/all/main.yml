@@ -1,4 +1,8 @@
 ---
+# Common ansible options
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30'
+ansible_user: "deploy"
+
 # Repository Manager Configuration
 use_repository_manager: true  # Activé par défaut
 repository_base_path: "/var/www/reports"
@@ -42,3 +46,4 @@ smtp_username: "{{ vault_smtp_username }}"
 smtp_password: "{{ vault_smtp_password }}"
 smtp_use_tls: "{{ vault_smtp_use_tls | default(true) }}"
 smtp_from: "{{ vault_smtp_from | default('ansible-reports@company.com') }}"
+

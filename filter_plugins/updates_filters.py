@@ -58,6 +58,46 @@ def redhat_parse_updates(package_lines):
     
     return packages
 
+def suse_parse_updates(package_lines):
+    """Parse SUSE/OpenSUSE package update lines"""
+    packages = []
+    for line in package_lines:
+        if line.strip():
+            parts = line.strip().split()
+            if len(parts) >= 3:
+                package_name = parts[0]
+                current_version = parts[1] if len(parts) > 1 else 'installed'
+                available_version = parts[2] if len(parts) > 2 else 'unknown'
+                
+                # Determine if it's a security update (basic heuristic)
+                is_security = 'security' in line.lower() or 'patch' in line.lower()
+                
+                packages.append({
+                    'name': package_name,
+                    'current_version': current_version,
+                    'available_version': available_version,
+                    'is_security': is_security,
+                    'architecture': 'unknown',
+                    'requires_reboot': 'kernel' in package_name.lower()
+                })
+    
+    return packages
+
+def extract_host_summary(host_data):
+    """Extract summary information for a host"""
+    return {
+        'hostname': host_data.get('metadata', {}).get('hostname', 'unknown'),
+        'fqdn': host_data.get('metadata', {}).get('fqdn', 'N/A'),
+        'ip_address': host_data.get('metadata', {}).get('ip_address', 'N/A'),
+        'distribution': host_data.get('system_info', {}).get('distribution', 'unknown'),
+        'version': host_data.get('system_info', {}).get('version', 'unknown'),
+        'total_updates': host_data.get('updates_summary', {}).get('total_updates', 0),
+        'security_updates': host_data.get('updates_summary', {}).get('security_updates', 0),
+        'critical_level': host_data.get('updates_summary', {}).get('critical_level', 'LOW'),
+        'requires_reboot': host_data.get('updates_summary', {}).get('requires_reboot', False),
+        'collection_timestamp': host_data.get('metadata', {}).get('collection_timestamp', 'unknown')
+    }
+
 class FilterModule(object):
     """Ansible filter plugin for updates parsing"""
     
@@ -65,4 +105,6 @@ class FilterModule(object):
         return {
             'debian_parse_updates': debian_parse_updates,
             'redhat_parse_updates': redhat_parse_updates,
+            'suse_parse_updates': suse_parse_updates,
+            'extract_host_summary': extract_host_summary,
         }

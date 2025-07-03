@@ -23,52 +23,51 @@
   hosts: repository_managers
   gather_facts: true
   vars:
-    # Force setup même si déjà initialisé (pour réinitialisation)
-    force_repository_setup: "{{ force_repo_setup | default(false) }}"
-  roles:
-    - role: repository_manager
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
+  tasks:
+    - name: "(repository_setup) Execute repository manager role"
+      include_role:
+        name: repository_manager
+      when: use_repository_manager | bool
       tags: [repository, setup]
-  when: groups['repository_managers'] is defined and groups['repository_managers'] | length > 0
 
 - name: "Collect Updates Information"
   hosts: all:!repository_managers
   gather_facts: true
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars:
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     # Transmettre l'information aux rôles
     repository_enabled: "{{ use_repository_manager | default(false) }}"
-  roles:
-    - role: updates_collector
+  tasks:
+    - name: "(updates_collection) Execute updates collector role"
+      include_role:
+        name: updates_collector
       tags: [collection, updates]
 
 - name: "Generate Consolidated Reports"
-  hosts: "{{ 'repository_managers' if use_repository_manager else 'localhost' }}"
+  hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
   gather_facts: true
   vars:
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
-  roles:
-    - role: report_generator
+  tasks:
+    - name: "(report_generation) Execute report generator role"
+      include_role:
+        name: report_generator
       tags: [reporting, generation]
-  when: groups['repository_managers'] is defined and groups['repository_managers'] | length > 0
-
-- name: "Generate Local Reports (Fallback)"
-  hosts: localhost
-  gather_facts: true
-  vars:
-    repository_enabled: false
-  roles:
-    - role: report_generator
-      tags: [reporting, generation, local]
-  when: groups['repository_managers'] is not defined or groups['repository_managers'] | length == 0
 
 - name: "Send Notifications"
-  hosts: "{{ 'repository_managers' if use_repository_manager else 'localhost' }}"
+  hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
   gather_facts: false
   vars:
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
-  roles:
-    - role: notification_manager
+  tasks:
+    - name: "(notification) Execute notification manager role"
+      include_role:
+        name: notification_manager
+      when: 
+        - send_notifications | default(true) | bool
+        - smtp_server is defined
       tags: [notification, email]
-  when: 
-    - send_notifications | default(true) | bool
-    - smtp_server is defined

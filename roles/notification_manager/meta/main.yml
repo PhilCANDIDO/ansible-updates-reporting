@@ -1,0 +1,31 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: DevOps Team
+  description: Notification management for system updates reporting
+  company: Company Name
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: EL
+      versions:
+        - 7
+        - 8
+        - 9
+    - name: Ubuntu
+      versions:
+        - 18.04
+        - 20.04
+        - 22.04
+    - name: Debian
+      versions:
+        - 10
+        - 11
+        - 12
+  galaxy_tags:
+    - notification
+    - email
+    - webhook
+    - reporting
+    - monitoring
+
+dependencies: []

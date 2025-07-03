@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "report_version": "1.0",
+    "report_type": "consolidated",
+    "execution_id": "{{ execution_id }}",
+    "generation_timestamp": "{{ consolidated_data.summary.generation_timestamp }}",
+    "storage_type": "{{ consolidated_data.summary.storage_type }}",
+    "report_location": "{{ consolidated_data.summary.report_location }}"
+  },
+  "summary": {
+    "total_hosts": {{ consolidated_data.summary.total_hosts }},
+    "total_updates": {{ consolidated_data.summary.total_updates }},
+    "total_security_updates": {{ consolidated_data.summary.total_security_updates }},
+    "hosts_requiring_reboot": {{ consolidated_data.summary.hosts_requiring_reboot }},
+    "critical_hosts": {{ consolidated_data.critical_hosts | length }},
+    "overall_priority": "{{ 'HIGH' if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates else ('MEDIUM' if consolidated_data.summary.total_security_updates > 0 else 'LOW') }}"
+  },
+  "hosts": {{ consolidated_data.hosts | to_nice_json }},
+  "os_distribution": {{ consolidated_data.by_os_family | to_nice_json }},
+  "critical_hosts": {{ consolidated_data.critical_hosts | to_nice_json }}
+}

@@ -1,0 +1,61 @@
+---
+- name: "(notification_manager) Include email notification tasks"
+  include_tasks: send_email.yml
+  when: 
+    - smtp_server is defined
+    - notification_recipients is defined
+  tags: [notification, email]
+
+- name: "(notification_manager) Include webhook notification tasks"
+  include_tasks: send_webhook.yml
+  when: webhook_url is defined
+  tags: [notification, webhook]
+
+---
+# roles/notification_manager/tasks/send_email.yml
+- name: "(send_email) Generate email report content"
+  template:
+    src: email_report.html.j2
+    dest: "/tmp/email_report_{{ execution_id }}.html"
+    mode: '0644'
+  tags: [notification, email, generation]
+
+- name: "(send_email) Send email notification to security team"
+  mail:
+    to: "{{ item.email }}"
+    subject: "Security Updates Report - {{ execution_id }} - {{ 'CRITICAL' if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates else 'INFO' }}"
+    body: "{{ lookup('file', '/tmp/email_report_' + execution_id + '.html') }}"
+    subtype: html
+    host: "{{ smtp_server }}"
+    port: "{{ smtp_port }}"
+    username: "{{ smtp_username }}"
+    password: "{{ smtp_password }}"
+    secure: "{{ 'starttls' if smtp_use_tls else 'never' }}"
+    from: "{{ smtp_from }}"
+  loop: "{{ notification_recipients | selectattr('type', 'equalto', 'security') | list }}"
+  when: 
+    - consolidated_data.summary.total_security_updates > 0
+    - item.type == 'security'
+  tags: [notification, email, security]
+
+- name: "(send_email) Send email notification to operations team"
+  mail:
+    to: "{{ item.email }}"
+    subject: "System Updates Report - {{ execution_id }}"
+    body: "{{ lookup('file', '/tmp/email_report_' + execution_id + '.html') }}"
+    subtype: html
+    host: "{{ smtp_server }}"
+    port: "{{ smtp_port }}"
+    username: "{{ smtp_username }}"
+    password: "{{ smtp_password }}"
+    secure: "{{ 'starttls' if smtp_use_tls else 'never' }}"
+    from: "{{ smtp_from }}"
+  loop: "{{ notification_recipients | selectattr('type', 'equalto', 'operations') | list }}"
+  when: item.type == 'operations'
+  tags: [notification, email, operations]
+
+- name: "(send_email) Cleanup temporary email file"
+  file:
+    path: "/tmp/email_report_{{ execution_id }}.html"
+    state: absent
+  tags: [notification, email, cleanup]

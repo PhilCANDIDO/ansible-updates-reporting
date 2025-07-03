@@ -1,0 +1,51 @@
+<VirtualHost *:80>
+    ServerName {{ ansible_fqdn }}
+    ServerAlias {{ ansible_hostname }}
+    DocumentRoot {{ repository_base_path }}
+    
+    # Security headers
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Disable server signature
+    ServerTokens {{ 'Off' if not webserver_security.server_tokens else 'On' }}
+    
+    # Main directory configuration
+    <Directory {{ repository_base_path }}>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+        
+        # Enable directory browsing
+        Options +Indexes
+        IndexOptions FancyIndexing HTMLTable SuppressDescription
+    </Directory>
+    
+    # JSON files with proper content type
+    <FilesMatch "\.json$">
+        Header set Content-Type "application/json"
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+    
+    # Excel files
+    <FilesMatch "\.xlsx?$">
+        Header set Content-Type "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        Header set Content-Disposition "attachment"
+    </FilesMatch>
+    
+    # HTML reports with security headers
+    <FilesMatch "\.html$">
+        Header set Content-Type "text/html"
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </FilesMatch>
+    
+    # Logging
+    {% if webserver_security.access_log %}
+    CustomLog ${APACHE_LOG_DIR}/updates-reports.access.log combined
+    {% endif %}
+    
+    {% if webserver_security.error_log %}
+    ErrorLog ${APACHE_LOG_DIR}/updates-reports.error.log
+    {% endif %}
+</VirtualHost>

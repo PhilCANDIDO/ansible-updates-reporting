@@ -1,0 +1,18 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Default variables for notification_manager role
+
+# Email configuration
+smtp_port: 587
+smtp_use_tls: true
+smtp_from: "ansible-reports@company.com"
+
+# Webhook configuration
+webhook_timeout: 30
+webhook_retries: 3
+
+# Notification thresholds
+notification_thresholds:
+  critical_security_updates: 5
+  high_total_updates: 50
+  reboot_required_hosts: 3
