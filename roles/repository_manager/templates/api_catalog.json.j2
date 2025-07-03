@@ -3,45 +3,84 @@
     "format": "{{ format_type }}",
     "description": "{{ format_type | title }} format reports for system updates",
     "content_type": "{% if format_type == 'json' %}application/json{% elif format_type == 'html' %}text/html{% elif format_type == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}",
-    "last_updated": "{{ ansible_date_time.iso8601 }}"
+    "last_updated": "{{ ansible_date_time.iso8601 }}",
+    "server": "{{ ansible_fqdn | default(ansible_hostname) }}"
   },
   "endpoints": {
     "format_root": "/{{ format_type }}/",
     "latest": "/{{ format_type }}/latest/",
-    "api_catalog": "/{{ format_type }}/api.json"
+    "api_catalog": "/{{ format_type }}/api.json",
+    "browse": "/{{ format_type }}/"
   },
   "available_timestamps": [
     {% for timestamp in format_directories %}
     {
       "timestamp": "{{ timestamp }}",
       "url": "/{{ format_type }}/{{ timestamp }}/",
-      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}"
+      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}",
+      "iso_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\1-\\2-\\3T\\4:\\5:\\6Z') }}"
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ],
-  "total_archives": {{ format_directories | length }},
-  "latest_timestamp": "{{ format_directories | first | default('N/A') }}",
-  "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
+  "statistics": {
+    "total_archives": {{ format_directories | length }},
+    "latest_timestamp": "{{ format_directories | first | default('N/A') }}",
+    "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
+    "retention_policy": {
+      "max_archives": {{ max_archived_reports | default(50) }},
+      "retention_days": {{ repository_retention_days | default(30) }}
+    }
+  },
   "quick_links": {
     "latest_reports": "/{{ format_type }}/latest/",
     {% if format_type == 'html' %}
     "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.html",
-    "latest_summary": "/{{ format_type }}/latest/email_summary.html"
+    "latest_summary": "/{{ format_type }}/latest/email_summary.html",
+    "latest_index": "/{{ format_type }}/latest/index.html"
     {% elif format_type == 'json' %}
     "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.json",
-    "latest_index": "/{{ format_type }}/latest/index.json"
+    "latest_index": "/{{ format_type }}/latest/index.json",
+    "latest_errors": "/{{ format_type }}/latest/errors.json"
     {% elif format_type == 'excel' %}
-    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.xlsx"
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.xlsx",
+    "latest_csv_summary": "/{{ format_type }}/latest/consolidated_summary.csv",
+    "latest_csv_packages": "/{{ format_type }}/latest/consolidated_packages.csv"
     {% endif %}
   },
   "navigation": {
     "parent_api": "/api.json",
+    "main_repository": "/",
     "sibling_formats": {
       {% for fmt in report_formats %}
       {% if fmt != format_type %}
       "{{ fmt }}": "/{{ fmt }}/api.json"{% if not loop.last %},{% endif %}
       {% endif %}
       {% endfor %}
+    }
+  },
+  "usage_examples": {
+    "browse_latest": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/",
+    "get_api_info": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json",
+    {% if format_type == 'json' %}
+    "get_latest_report": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report.json | jq .",
+    "list_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json | jq '.available_timestamps[].timestamp'"
+    {% elif format_type == 'html' %}
+    "view_latest_report": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report.html",
+    "view_email_summary": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/email_summary.html"
+    {% elif format_type == 'excel' %}
+    "download_latest": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report.xlsx",
+    "download_csv_fallback": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_summary.csv"
+    {% endif %}
+  },
+  "repository_info": {
+    "webserver_type": "{{ webserver_type | default('apache') }}",
+    "base_path": "{{ repository_base_path }}",
+    "os_info": "{{ os_detection.distribution | default(ansible_distribution) }} {{ os_detection.version | default(ansible_distribution_version) }}",
+    "features": {
+      "cors_enabled": true,
+      "compression_enabled": {{ enable_compression | default(true) | lower }},
+      "caching_enabled": {{ enable_caching | default(true) | lower }},
+      "directory_browsing": {{ enable_directory_browsing | default(true) | lower }}
     }
   }
 }

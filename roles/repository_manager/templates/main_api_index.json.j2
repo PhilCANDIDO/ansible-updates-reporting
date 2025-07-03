@@ -5,16 +5,23 @@
     "description": "REST API for accessing system updates reports",
     "server": "{{ ansible_fqdn | default(ansible_hostname) }}",
     "last_updated": "{{ ansible_date_time.iso8601 }}",
-    "documentation": "https://github.com/PhilCANDIDO/ansible-updates-reporting"
+    "documentation": "https://github.com/PhilCANDIDO/ansible-updates-reporting",
+    "repository_manager": {
+      "webserver": "{{ webserver_type | default('apache') }}",
+      "os": "{{ os_detection.distribution | default(ansible_distribution) }} {{ os_detection.version | default(ansible_distribution_version) }}",
+      "base_path": "{{ repository_base_path }}"
+    }
   },
   "endpoints": {
     "root": {
       "url": "/",
-      "description": "Main repository landing page"
+      "description": "Main repository landing page",
+      "method": "GET"
     },
     "api_info": {
       "url": "/api.json",
-      "description": "This API information endpoint"
+      "description": "This API information endpoint",
+      "method": "GET"
     }
   },
   "formats": {
@@ -24,7 +31,23 @@
       "api_catalog": "/{{ format }}/api.json",
       "latest": "/{{ format }}/latest/",
       "description": "{{ format | title }} format reports",
-      "content_type": "{% if format == 'json' %}application/json{% elif format == 'html' %}text/html{% elif format == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}"
+      "content_type": "{% if format == 'json' %}application/json{% elif format == 'html' %}text/html{% elif format == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}",
+      "features": {
+        {% if format == 'json' %}
+        "machine_readable": true,
+        "api_integration": true,
+        "structured_data": true
+        {% elif format == 'html' %}
+        "human_readable": true,
+        "web_browser_compatible": true,
+        "email_compatible": true,
+        "search_functionality": true
+        {% elif format == 'excel' %}
+        "spreadsheet_compatible": true,
+        "office_integration": true,
+        "csv_fallback": true
+        {% endif %}
+      }
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   },
@@ -36,7 +59,8 @@
     "oldest_timestamp": "{{ all_directories | default([]) | last | default('N/A') }}",
     "retention_policy": {
       "max_archives": {{ max_archived_reports | default(50) }},
-      "retention_days": {{ repository_retention_days | default(30) }}
+      "retention_days": {{ repository_retention_days | default(30) }},
+      "cleanup_enabled": true
     }
   },
   "quick_access": {
@@ -49,20 +73,50 @@
       {% for format in report_formats %}
       "{{ format }}": "/{{ format }}/api.json"{% if not loop.last %},{% endif %}
       {% endfor %}
+    },
+    "consolidated_reports": {
+      {% for format in report_formats %}
+      {% if format == 'html' %}
+      "latest_html": "/{{ format }}/latest/consolidated_report.html",
+      "latest_email": "/{{ format }}/latest/email_summary.html"
+      {% elif format == 'json' %}
+      "latest_json": "/{{ format }}/latest/consolidated_report.json"
+      {% elif format == 'excel' %}
+      "latest_excel": "/{{ format }}/latest/consolidated_report.xlsx"
+      {% endif %}{% if not loop.last %},{% endif %}
+      {% endfor %}
     }
   },
   "usage_examples": {
     "get_all_formats": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/api.json",
     "get_latest_html": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/latest/",
     "get_latest_json": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/latest/",
-    "list_json_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/api.json",
-    "get_specific_timestamp": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/{{ all_directories | default([]) | first | default('20250703160449') }}/"
+    "list_json_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/api.json | jq '.available_timestamps'",
+    "get_specific_timestamp": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/{{ all_directories | default([]) | first | default('20250703160449') }}/",
+    "download_excel": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/excel/latest/consolidated_report.xlsx"
   },
   "integration_notes": {
     "cors": "CORS headers are enabled for API endpoints",
-    "authentication": "No authentication required for read-only access",
+    "authentication": "No authentication required for read-only access", 
     "rate_limiting": "No rate limiting currently implemented",
     "caching": "Static files are cached by the web server",
-    "timestamps": "All timestamps use format YYYYMMDDhhmmss in UTC"
+    "timestamps": "All timestamps use format YYYYMMDDhhmmss in UTC",
+    "compression": "Content compression enabled for better performance",
+    "security": {
+      "headers": "Security headers enabled (X-Frame-Options, X-Content-Type-Options, etc.)",
+      "file_types": "Proper MIME types set for all file formats",
+      "access_control": "Directory browsing enabled with proper access controls"
+    }
+  },
+  "server_capabilities": {
+    "webserver": "{{ webserver_type | default('apache') }}",
+    "compression": {{ enable_compression | default(true) | lower }},
+    "caching": {{ enable_caching | default(true) | lower }},
+    "ssl_enabled": {{ enable_ssl | default(false) | lower }},
+    "firewall_configured": {{ configure_firewall | default(true) | lower }},
+    {% if ansible_os_family == 'RedHat' %}
+    "selinux_configured": {{ configure_selinux | default(true) | lower }},
+    {% endif %}
+    "index_generation": "Dynamic index pages with search functionality"
   }
 }
