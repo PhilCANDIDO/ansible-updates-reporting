@@ -3,8 +3,8 @@
   file:
     path: "{{ repository_base_path }}"
     state: directory
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
     mode: '0755'
   tags: [setup, directories]
 
@@ -12,8 +12,8 @@
   file:
     path: "{{ repository_base_path }}/{{ item }}"
     state: directory
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
     mode: '0755'
   loop: "{{ report_formats }}"
   tags: [setup, directories]
@@ -22,8 +22,26 @@
   file:
     path: "{{ repository_base_path }}/{{ item[1] }}/{{ item[0] }}"
     state: directory
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
     mode: '0755'
   loop: "{{ report_formats | product(['current', 'archive']) | list }}"
   tags: [setup, directories]
+
+- name: "(setup_directories) Create log directory for repository"
+  file:
+    path: "{{ repository_base_path }}/logs"
+    state: directory
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
+    mode: '0755'
+  tags: [setup, directories]
+
+- name: "(setup_directories) Create index.html for repository root"
+  template:
+    src: index.html.j2
+    dest: "{{ repository_base_path }}/index.html"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
+    mode: '0644'
+  tags: [setup, directories, index]

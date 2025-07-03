@@ -13,8 +13,8 @@
   file:
     path: "{{ repository_base_path }}/{{ item }}/archive/{{ ansible_date_time.date }}"
     state: directory
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
     mode: '0755'
   loop: "{{ report_formats }}"
   when: old_reports.results | selectattr('files', 'defined') | selectattr('files', '!=', []) | list | length > 0
@@ -85,6 +85,8 @@
       deleted_files: "{{ very_old_reports.results | map(attribute='files') | flatten | length }}"
       cleanup_date: "{{ ansible_date_time.iso8601 }}"
       retention_policy: "{{ repository_retention_days }} days"
+      repository_user: "{{ current_webserver_user }}"
+      repository_group: "{{ current_webserver_group }}"
   tags: [cleanup, summary]
 
 - name: "(cleanup_reports) Log cleanup summary"
@@ -95,14 +97,15 @@
       - Files deleted: {{ cleanup_summary.deleted_files }}
       - Cleanup date: {{ cleanup_summary.cleanup_date }}
       - Retention policy: {{ cleanup_summary.retention_policy }}
+      - Repository owner: {{ cleanup_summary.repository_user }}:{{ cleanup_summary.repository_group }}
   tags: [cleanup, summary, log]
 
 - name: "(cleanup_reports) Create cleanup log entry"
   lineinfile:
-    path: "{{ repository_base_path }}/cleanup.log"
-    line: "{{ ansible_date_time.iso8601 }} - Archived: {{ cleanup_summary.archived_files }}, Deleted: {{ cleanup_summary.deleted_files }}"
+    path: "{{ repository_base_path }}/logs/cleanup.log"
+    line: "{{ ansible_date_time.iso8601 }} - OS: {{ os_detection.distribution }} {{ os_detection.version }} - Archived: {{ cleanup_summary.archived_files }}, Deleted: {{ cleanup_summary.deleted_files }}"
     create: true
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user }}"
+    group: "{{ current_webserver_group }}"
     mode: '0644'
   tags: [cleanup, logging]

@@ -1,7 +1,7 @@
 ---
 - name: "(configure_webserver) Install webserver packages"
   package:
-    name: "{{ webserver_packages[webserver_type] }}"
+    name: "{{ current_webserver_packages }}"
     state: present
   tags: [setup, webserver, packages]
 
@@ -13,33 +13,139 @@
     state: present
   tags: [setup, packages, python]
 
+- name: "(configure_webserver) Enable Apache modules (Debian/Ubuntu)"
+  apache2_module:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ apache_modules[ansible_os_family] }}"
+  when: 
+    - webserver_type == 'apache'
+    - ansible_os_family == 'Debian'
+  notify: "restart {{ webserver_type }}"
+  tags: [setup, webserver, modules]
+
+- name: "(configure_webserver) Enable Apache modules (SUSE)"
+  command: "a2enmod {{ item }}"
+  loop: "{{ apache_modules[ansible_os_family] }}"
+  when: 
+    - webserver_type == 'apache'
+    - ansible_os_family == 'Suse'
+  notify: "restart {{ webserver_type }}"
+  changed_when: false
+  tags: [setup, webserver, modules]
+
 - name: "(configure_webserver) Generate webserver configuration"
   template:
     src: "{{ webserver_type }}_site.conf.j2"
-    dest: "{{ webserver_config_path[webserver_type] }}/updates-reports"
+    dest: "{{ current_webserver_config_path }}/updates-reports.conf"
     backup: true
+    owner: root
+    group: root
+    mode: '0644'
   notify: "restart {{ webserver_type }}"
   tags: [setup, webserver, config]
 
-- name: "(configure_webserver) Enable site configuration"
-  file:
-    src: "{{ webserver_config_path[webserver_type] }}/updates-reports"
-    dest: "{{ webserver_enabled_path[webserver_type] }}/updates-reports"
-    state: link
+- name: "(configure_webserver) Enable site configuration (Debian/Ubuntu Apache)"
+  command: "a2ensite updates-reports.conf"
+  when: 
+    - webserver_type == 'apache'
+    - ansible_os_family == 'Debian'
   notify: "restart {{ webserver_type }}"
-  when: webserver_type == 'nginx'
-  tags: [setup, webserver, config]
-
-- name: "(configure_webserver) Enable Apache site"
-  command: a2ensite updates-reports
-  notify: "restart {{ webserver_type }}"
-  when: webserver_type == 'apache'
   changed_when: false
-  tags: [setup, webserver, config]
+  tags: [setup, webserver, enable_site]
+
+- name: "(configure_webserver) Enable site configuration (SUSE Apache)"
+  command: "a2ensite updates-reports"
+  when: 
+    - webserver_type == 'apache'
+    - ansible_os_family == 'Suse'
+  notify: "restart {{ webserver_type }}"
+  changed_when: false
+  tags: [setup, webserver, enable_site]
+
+- name: "(configure_webserver) Create nginx site symlink (Debian/Ubuntu)"
+  file:
+    src: "{{ current_webserver_config_path }}/updates-reports.conf"
+    dest: "{{ current_webserver_enabled_path }}/updates-reports.conf"
+    state: link
+  when: 
+    - webserver_type == 'nginx'
+    - ansible_os_family == 'Debian'
+  notify: "restart {{ webserver_type }}"
+  tags: [setup, webserver, enable_site]
+
+- name: "(configure_webserver) Configure SELinux for Apache (RedHat family)"
+  seboolean:
+    name: "{{ item }}"
+    state: true
+    persistent: true
+  loop: "{{ selinux_booleans }}"
+  when: 
+    - ansible_os_family == 'RedHat'
+    - webserver_type == 'apache'
+    - configure_selinux | bool
+    - ansible_selinux.status == 'enabled'
+  tags: [setup, webserver, selinux]
+
+- name: "(configure_webserver) Set SELinux context for repository directory (RedHat family)"
+  sefcontext:
+    target: "{{ repository_base_path }}(/.*)?"
+    setype: httpd_exec_t
+    state: present
+  when: 
+    - ansible_os_family == 'RedHat'
+    - webserver_type == 'apache'
+    - configure_selinux | bool
+    - ansible_selinux.status == 'enabled'
+  tags: [setup, webserver, selinux]
+
+- name: "(configure_webserver) Apply SELinux context to repository directory (RedHat family)"
+  command: "restorecon -R {{ repository_base_path }}"
+  when: 
+    - ansible_os_family == 'RedHat'
+    - webserver_type == 'apache'
+    - configure_selinux | bool
+    - ansible_selinux.status == 'enabled'
+  changed_when: false
+  tags: [setup, webserver, selinux]
+
+- name: "(configure_webserver) Configure firewall - firewalld (RedHat family)"
+  firewalld:
+    service: "{{ 'https' if enable_ssl else 'http' }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  when: 
+    - ansible_os_family == 'RedHat'
+    - configure_firewall | bool
+  tags: [setup, webserver, firewall]
+
+- name: "(configure_webserver) Configure firewall - ufw (Debian family)"
+  ufw:
+    rule: allow
+    port: "{{ item.split('/')[0] }}"
+    proto: "{{ item.split('/')[1] }}"
+  loop: "{{ firewall_ports }}"
+  when: 
+    - ansible_os_family == 'Debian'
+    - configure_firewall | bool
+  tags: [setup, webserver, firewall]
 
 - name: "(configure_webserver) Ensure webserver is started and enabled"
   service:
-    name: "{{ webserver_service[webserver_type] }}"
+    name: "{{ current_webserver_service }}"
     state: started
     enabled: true
   tags: [setup, webserver, service]
+
+- name: "(configure_webserver) Verify webserver configuration"
+  command: "{{ 'nginx -t' if webserver_type == 'nginx' else 'httpd -t' if ansible_os_family == 'RedHat' else 'apache2ctl -t' }}"
+  register: webserver_config_test
+  changed_when: false
+  failed_when: webserver_config_test.rc != 0
+  tags: [setup, webserver, validation]
+
+- name: "(configure_webserver) Display webserver configuration test results"
+  debug:
+    msg: "Webserver configuration test: {{ webserver_config_test.stdout }}"
+  tags: [setup, webserver, validation]

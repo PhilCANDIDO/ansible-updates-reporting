@@ -1,5 +1,5 @@
 <VirtualHost *:80>
-    ServerName {{ ansible_fqdn }}
+    ServerName {{ ansible_fqdn | default(ansible_hostname) }}
     ServerAlias {{ ansible_hostname }}
     DocumentRoot {{ repository_base_path }}
     
@@ -15,7 +15,14 @@
     <Directory {{ repository_base_path }}>
         Options Indexes FollowSymLinks
         AllowOverride None
+        {% if ansible_distribution_major_version | int >= 8 and ansible_os_family == 'RedHat' %}
         Require all granted
+        {% elif ansible_distribution_major_version | int >= 2.4 and ansible_os_family == 'Debian' %}
+        Require all granted
+        {% else %}
+        Order allow,deny
+        Allow from all
+        {% endif %}
         
         # Enable directory browsing
         Options +Indexes
@@ -42,10 +49,14 @@
     
     # Logging
     {% if webserver_security.access_log %}
-    CustomLog ${APACHE_LOG_DIR}/updates-reports.access.log combined
+    {% if ansible_os_family == 'RedHat' %}
+    CustomLog {{ current_webserver_log_path }}/updates-reports.access.log combined
+    {% else %}
+    CustomLog {{ current_webserver_log_path }}/updates-reports.access.log combined
+    {% endif %}
     {% endif %}
     
     {% if webserver_security.error_log %}
-    ErrorLog ${APACHE_LOG_DIR}/updates-reports.error.log
+    ErrorLog {{ current_webserver_log_path }}/updates-reports.error.log
     {% endif %}
 </VirtualHost>

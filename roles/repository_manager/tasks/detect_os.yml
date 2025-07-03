@@ -1,0 +1,69 @@
+---
+- name: "(detect_os) Gather OS distribution facts"
+  setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - "distribution"
+      - "distribution_version"
+      - "distribution_major_version"
+      - "os_family"
+  tags: [detection, facts]
+
+- name: "(detect_os) Set OS-specific variables"
+  set_fact:
+    os_detection:
+      family: "{{ ansible_os_family }}"
+      distribution: "{{ ansible_distribution }}"
+      version: "{{ ansible_distribution_version }}"
+      major_version: "{{ ansible_distribution_major_version }}"
+  tags: [detection, variables]
+
+- name: "(detect_os) Validate supported OS family"
+  assert:
+    that:
+      - ansible_os_family in ['Debian', 'RedHat', 'Suse']
+    fail_msg: "Unsupported OS family: {{ ansible_os_family }}"
+    success_msg: "OS {{ ansible_distribution }} {{ ansible_distribution_version }} is supported"
+  tags: [detection, validation]
+
+- name: "(detect_os) Set webserver packages for current OS"
+  set_fact:
+    current_webserver_packages: "{{ webserver_packages[webserver_type][ansible_os_family] }}"
+  tags: [detection, packages]
+
+- name: "(detect_os) Set webserver service name for current OS"
+  set_fact:
+    current_webserver_service: "{{ webserver_service[webserver_type][ansible_os_family] }}"
+  tags: [detection, service]
+
+- name: "(detect_os) Set webserver configuration paths for current OS"
+  set_fact:
+    current_webserver_config_path: "{{ webserver_config_path[webserver_type][ansible_os_family] }}"
+    current_webserver_enabled_path: "{{ webserver_enabled_path[webserver_type][ansible_os_family] }}"
+  tags: [detection, paths]
+
+- name: "(detect_os) Set webserver user and group for current OS"
+  set_fact:
+    current_webserver_user: "{{ webserver_user_group[webserver_type][ansible_os_family].user }}"
+    current_webserver_group: "{{ webserver_user_group[webserver_type][ansible_os_family].group }}"
+  tags: [detection, user_group]
+
+- name: "(detect_os) Set log path for current OS"
+  set_fact:
+    current_webserver_log_path: "{{ webserver_log_path[webserver_type][ansible_os_family] }}"
+  tags: [detection, logs]
+
+- name: "(detect_os) Display detected OS configuration"
+  debug:
+    msg: |
+      OS Detection Results:
+      - Family: {{ os_detection.family }}
+      - Distribution: {{ os_detection.distribution }}
+      - Version: {{ os_detection.version }}
+      - Webserver: {{ webserver_type }}
+      - Service: {{ current_webserver_service }}
+      - User: {{ current_webserver_user }}
+      - Group: {{ current_webserver_group }}
+      - Config Path: {{ current_webserver_config_path }}
+  tags: [detection, debug]

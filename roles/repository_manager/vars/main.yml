@@ -1,3 +1,80 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# vars file for roles/repository_manager
+# OS-specific variables for repository_manager role
+
+# Package mappings by OS family
+webserver_packages:
+  nginx:
+    Debian: ["nginx", "python3-pip"]
+    RedHat: ["nginx", "python3-pip"]
+    Suse: ["nginx", "python3-pip"]
+  apache:
+    Debian: ["apache2", "python3-pip", "libapache2-mod-headers"]
+    RedHat: ["httpd", "python3-pip", "mod_ssl"]
+    Suse: ["apache2", "python3-pip", "apache2-mod_headers"]
+
+# Service names by OS family
+webserver_service:
+  nginx:
+    Debian: "nginx"
+    RedHat: "nginx"
+    Suse: "nginx"
+  apache:
+    Debian: "apache2"
+    RedHat: "httpd"
+    Suse: "apache2"
+
+# Configuration paths by OS family
+webserver_config_path:
+  nginx:
+    Debian: "/etc/nginx/sites-available"
+    RedHat: "/etc/nginx/conf.d"
+    Suse: "/etc/nginx/conf.d"
+  apache:
+    Debian: "/etc/apache2/sites-available"
+    RedHat: "/etc/httpd/conf.d"
+    Suse: "/etc/apache2/conf.d"
+
+# Enabled sites paths (mainly for Debian/Ubuntu)
+webserver_enabled_path:
+  nginx:
+    Debian: "/etc/nginx/sites-enabled"
+    RedHat: "/etc/nginx/conf.d"  # Same as config path
+    Suse: "/etc/nginx/conf.d"   # Same as config path
+  apache:
+    Debian: "/etc/apache2/sites-enabled"
+    RedHat: "/etc/httpd/conf.d"  # Same as config path
+    Suse: "/etc/apache2/conf.d"  # Same as config path
+
+# Log paths by OS family
+webserver_log_path:
+  nginx:
+    Debian: "/var/log/nginx"
+    RedHat: "/var/log/nginx"
+    Suse: "/var/log/nginx"
+  apache:
+    Debian: "/var/log/apache2"
+    RedHat: "/var/log/httpd"
+    Suse: "/var/log/apache2"
+
+# User and group by OS family
+webserver_user_group:
+  nginx:
+    Debian: { user: "www-data", group: "www-data" }
+    RedHat: { user: "nginx", group: "nginx" }
+    Suse: { user: "wwwrun", group: "www" }
+  apache:
+    Debian: { user: "www-data", group: "www-data" }
+    RedHat: { user: "apache", group: "apache" }
+    Suse: { user: "wwwrun", group: "www" }
+
+# Apache modules to enable by OS family
+apache_modules:
+  Debian: ["rewrite", "headers", "dir", "mime"]
+  RedHat: []  # Modules are compiled in or loaded by default
+  Suse: ["rewrite", "headers", "dir", "mime"]
+
+# Python package manager by OS family
+python_package_manager:
+  Debian: "apt"
+  RedHat: "yum"
+  Suse: "zypper"

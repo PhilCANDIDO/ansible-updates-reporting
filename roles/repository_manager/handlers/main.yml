@@ -1,18 +1,37 @@
 ---
 - name: "restart nginx"
   service:
-    name: nginx
+    name: "{{ current_webserver_service }}"
     state: restarted
+  when: webserver_type == 'nginx'
   tags: [handlers, webserver]
 
 - name: "restart apache"
   service:
-    name: "{{ 'apache2' if ansible_os_family == 'Debian' else 'httpd' }}"
+    name: "{{ current_webserver_service }}"
     state: restarted
+  when: webserver_type == 'apache'
   tags: [handlers, webserver]
 
 - name: "reload nginx"
   service:
-    name: nginx
+    name: "{{ current_webserver_service }}"
     state: reloaded
+  when: webserver_type == 'nginx'
   tags: [handlers, webserver]
+
+- name: "reload apache"
+  service:
+    name: "{{ current_webserver_service }}"
+    state: reloaded
+  when: webserver_type == 'apache'
+  tags: [handlers, webserver]
+
+- name: "restart firewalld"
+  service:
+    name: firewalld
+    state: restarted
+  when: 
+    - ansible_os_family == 'RedHat'
+    - configure_firewall | bool
+  tags: [handlers, firewall]

@@ -1,11 +1,40 @@
-# Dans group_vars/all/main.yml (déjà présent)
-repository_retention_days: 30  # Déjà défini
-repository_base_path: "/var/www/reports"  # Déjà défini
-report_formats:  # Déjà défini
+---
+# Default variables for repository_manager role
+
+# Repository configuration
+repository_base_path: "/var/www/reports"
+repository_retention_days: 30
+webserver_type: "apache"  # nginx or apache
+
+# Report formats
+report_formats:
   - json
   - html
   - excel
 
-# Variables optionnelles
-webserver_user: "www-data"  # ou nginx selon la distribution
-webserver_group: "www-data"
+# Repository initialization control
+force_repository_setup: false
+
+# Web server security configuration
+webserver_security:
+  server_tokens: false
+  client_max_body_size: "10M"
+  access_log: true
+  error_log: true
+
+# Firewall configuration
+configure_firewall: true
+firewall_ports:
+  - "80/tcp"
+  - "443/tcp"
+
+# SELinux configuration (for RedHat family)
+configure_selinux: true
+selinux_booleans:
+  - "httpd_can_network_connect"
+  - "httpd_read_user_content"
+
+# SSL/TLS configuration (optional)
+enable_ssl: false
+ssl_cert_path: "/etc/ssl/certs/updates-reports.crt"
+ssl_key_path: "/etc/ssl/private/updates-reports.key"

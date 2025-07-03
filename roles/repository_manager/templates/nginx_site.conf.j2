@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name {{ ansible_fqdn }} {{ ansible_hostname }};
+    server_name {{ ansible_fqdn | default(ansible_hostname) }} {{ ansible_hostname }};
     
     root {{ repository_base_path }};
     index index.html;
@@ -44,12 +44,12 @@ server {
     
     # Logging
     {% if webserver_security.access_log %}
-    access_log /var/log/nginx/updates-reports.access.log;
+    access_log {{ current_webserver_log_path }}/updates-reports.access.log;
     {% else %}
     access_log off;
     {% endif %}
     
     {% if webserver_security.error_log %}
-    error_log /var/log/nginx/updates-reports.error.log;
+    error_log {{ current_webserver_log_path }}/updates-reports.error.log;
     {% endif %}
 }

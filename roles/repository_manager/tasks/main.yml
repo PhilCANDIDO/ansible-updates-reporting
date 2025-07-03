@@ -1,4 +1,8 @@
 ---
+- name: "(repository_manager) Include OS detection tasks"
+  include_tasks: detect_os.yml
+  tags: [detection, os]
+
 - name: "(repository_manager) Include initialization check tasks"
   include_tasks: check_initialization.yml
   tags: [initialization, check]
