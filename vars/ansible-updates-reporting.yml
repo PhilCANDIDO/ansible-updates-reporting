@@ -35,9 +35,10 @@ security_thresholds:
   total_updates: 50
 
 # SMTP configuration (use Ansible Vault for sensitive data)
-smtp_server: "{{ vault_smtp_server }}"
-smtp_port: "{{ vault_smtp_port | default(587) }}"
-smtp_username: "{{ vault_smtp_username }}"
-smtp_password: "{{ vault_smtp_password }}"
-smtp_use_tls: "{{ vault_smtp_use_tls | default(true) }}"
-smtp_from: "{{ vault_smtp_from | default('ansible-reports@company.com') }}"
+# Note: Uncomment and configure these variables or use Ansible Vault
+# smtp_server: "{{ vault_smtp_server | default('localhost') }}"
+# smtp_port: "{{ vault_smtp_port | default(587) }}"
+# smtp_username: "{{ vault_smtp_username | default('') }}"
+# smtp_password: "{{ vault_smtp_password | default('') }}"
+# smtp_use_tls: "{{ vault_smtp_use_tls | default(true) }}"
+# smtp_from: "{{ vault_smtp_from | default('ansible-reports@company.com') }}"

@@ -1,0 +1,37 @@
+---
+- name: "(setup_variables) Ensure execution_id is defined"
+  set_fact:
+    execution_id: "{{ execution_id | default(ansible_date_time.iso8601_basic_short) }}"
+  when: execution_id is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set default security thresholds if not defined"
+  set_fact:
+    security_thresholds:
+      critical_updates: "{{ security_thresholds.critical_updates | default(5) }}"
+      security_updates: "{{ security_thresholds.security_updates | default(10) }}"
+      total_updates: "{{ security_thresholds.total_updates | default(50) }}"
+  when: security_thresholds is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set default local reports path if not defined"
+  set_fact:
+    local_reports_path: "{{ local_reports_path | default('/tmp/ansible-reports') }}"
+  when: local_reports_path is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set default use_repository_manager if not defined"
+  set_fact:
+    use_repository_manager: "{{ use_repository_manager | default(false) }}"
+  when: use_repository_manager is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Display variable status"
+  debug:
+    msg: |
+      Variable Setup:
+      - execution_id: {{ execution_id }}
+      - use_repository_manager: {{ use_repository_manager }}
+      - local_reports_path: {{ local_reports_path }}
+      - security_thresholds: {{ security_thresholds }}
+  tags: [setup, variables, debug]

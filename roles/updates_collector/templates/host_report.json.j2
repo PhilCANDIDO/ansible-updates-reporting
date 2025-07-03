@@ -1,26 +1,26 @@
 {
   "metadata": {
     "report_version": "1.0",
-    "execution_id": "{{ execution_id }}",
-    "collection_timestamp": "{{ collected_updates.collection_timestamp }}",
+    "execution_id": "{{ execution_id | default(ansible_date_time.iso8601_basic_short) }}",
+    "collection_timestamp": "{{ collected_updates.collection_timestamp | default(ansible_date_time.iso8601) }}",
     "hostname": "{{ inventory_hostname }}",
     "fqdn": "{{ ansible_fqdn | default('N/A') }}",
     "ip_address": "{{ ansible_default_ipv4.address | default('N/A') }}"
   },
   "system_info": {
-    "os_family": "{{ os_detection.family }}",
-    "distribution": "{{ os_detection.distribution }}",
-    "version": "{{ os_detection.version }}",
-    "architecture": "{{ os_detection.architecture }}",
+    "os_family": "{{ os_detection.family | default(ansible_os_family) }}",
+    "distribution": "{{ os_detection.distribution | default(ansible_distribution) }}",
+    "version": "{{ os_detection.version | default(ansible_distribution_version) }}",
+    "architecture": "{{ os_detection.architecture | default(ansible_architecture) }}",
     "kernel": "{{ ansible_kernel | default('N/A') }}",
     "uptime_seconds": {{ ansible_uptime_seconds | default(0) }}
   },
   "updates_summary": {
-    "total_updates": {{ collected_updates.total_count }},
-    "security_updates": {{ collected_updates.security_count }},
-    "critical_level": "{{ 'HIGH' if collected_updates.security_count > security_thresholds.critical_updates else ('MEDIUM' if collected_updates.security_count > 0 else 'LOW') }}",
-    "collection_method": "{{ collected_updates.collection_method }}",
-    "requires_reboot": {{ (collected_updates.packages | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0) | lower }}
+    "total_updates": {{ collected_updates.total_count | default(0) }},
+    "security_updates": {{ collected_updates.security_count | default(0) }},
+    "critical_level": "{{ 'HIGH' if (collected_updates.security_count | default(0)) > (security_thresholds.critical_updates | default(5)) else ('MEDIUM' if (collected_updates.security_count | default(0)) > 0 else 'LOW') }}",
+    "collection_method": "{{ collected_updates.collection_method | default('unknown') }}",
+    "requires_reboot": {{ (collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0) | lower }}
   },
-  "packages": {{ collected_updates.packages | to_nice_json }}
+  "packages": {{ collected_updates.packages | default([]) | to_nice_json }}
 }

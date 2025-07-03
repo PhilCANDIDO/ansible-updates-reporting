@@ -1,4 +1,10 @@
 ---
+- name: "(generate_local_report) Ensure execution_id is defined"
+  set_fact:
+    execution_id: "{{ execution_id | default(ansible_date_time.iso8601_basic_short) }}"
+  when: execution_id is not defined
+  tags: [generation, local, variables]
+
 - name: "(generate_local_report) Create local reports directory"
   file:
     path: "{{ local_reports_path }}"

@@ -1,3 +1,23 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for roles/updates_collector
+
+# Execution configuration
+execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
+
+# Local storage configuration
+local_reports_path: "/tmp/ansible-reports"
+
+# Repository manager configuration
+use_repository_manager: false
+repository_base_path: "/var/www/reports"
+
+# Security thresholds
+security_thresholds:
+  critical_updates: 5
+  security_updates: 10
+  total_updates: 50
+
+# Collection settings
+collection_timeout: 300
+package_cache_valid_time: 3600

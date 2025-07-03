@@ -1,4 +1,8 @@
 ---
+- name: "(updates_collector) Include variable setup tasks"
+  include_tasks: setup_variables.yml
+  tags: [setup, variables]
+
 - name: "(updates_collector) Include OS detection tasks"
   include_tasks: detect_os.yml
   tags: [detection, os]
