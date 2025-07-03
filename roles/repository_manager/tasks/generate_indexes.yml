@@ -1,0 +1,73 @@
+---
+- name: "(generate_indexes) Find all timestamped directories for index generation"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}"
+    file_type: directory
+    patterns: "[0-9]*"
+    excludes: 
+      - "archive"
+      - "latest"
+  register: timestamped_dirs_for_indexes
+  loop: "{{ report_formats }}"
+  tags: [indexes, discovery]
+
+- name: "(generate_indexes) Generate main repository index.html"
+  template:
+    src: main_index.html.j2
+    dest: "{{ repository_base_path }}/index.html"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  become: true
+  tags: [indexes, main]
+
+- name: "(generate_indexes) Generate format-specific index.html files"
+  template:
+    src: format_index.html.j2
+    dest: "{{ repository_base_path }}/{{ item }}/index.html"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  loop: "{{ report_formats }}"
+  become: true
+  vars:
+    format_type: "{{ item }}"
+    format_directories: "{{ timestamped_dirs_for_indexes.results | selectattr('item', 'equalto', item) | map(attribute='files') | flatten | map(attribute='path') | map('basename') | sort(reverse=true) | list }}"
+  tags: [indexes, formats]
+
+- name: "(generate_indexes) Generate API catalog for each format"
+  template:
+    src: api_catalog.json.j2
+    dest: "{{ repository_base_path }}/{{ item }}/api.json"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  loop: "{{ report_formats }}"
+  vars:
+    format_type: "{{ item }}"
+    format_directories: "{{ timestamped_dirs_for_indexes.results | selectattr('item', 'equalto', item) | map(attribute='files') | flatten | map(attribute='path') | map('basename') | sort(reverse=true) | list }}"
+  become: true
+  tags: [indexes, api]
+
+- name: "(generate_indexes) Generate main API index"
+  template:
+    src: main_api_index.json.j2
+    dest: "{{ repository_base_path }}/api.json"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  become: true
+  vars:
+    all_directories: "{{ timestamped_dirs_for_indexes.results | map(attribute='files') | flatten | map(attribute='path') | map('basename') | unique | sort(reverse=true) | list }}"
+  tags: [indexes, main_api]
+
+- name: "(generate_indexes) Display index generation summary"
+  debug:
+    msg: |
+      Index Generation Summary:
+      - Main repository index: {{ repository_base_path }}/index.html
+      - Format indexes: {{ report_formats | join(', ') }}
+      - API catalogs: {{ report_formats | join(', ') }}
+      - Main API: {{ repository_base_path }}/api.json
+      - Total timestamped directories: {{ timestamped_dirs_for_indexes.results | map(attribute='files') | flatten | length }}
+  tags: [indexes, summary]

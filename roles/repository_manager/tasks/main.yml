@@ -22,6 +22,10 @@
   when: not repository_already_initialized | bool
   tags: [initialization, marker]
 
+- name: "(repository_manager) Include index generation tasks"
+  include_tasks: generate_indexes.yml
+  tags: [indexes, generation]
+
 - name: "(repository_manager) Include cleanup tasks"
   include_tasks: cleanup_reports.yml
   tags: [cleanup, maintenance]

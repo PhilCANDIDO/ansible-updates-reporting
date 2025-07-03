@@ -84,8 +84,7 @@
         name: report_generator
       tags: [reporting, generation]
 
-# site.yml - Section à corriger
-- name: "Update Repository APIs and Indexes"
+- name: "Update Repository Indexes and APIs"
   hosts: repository_managers
   gather_facts: false
   vars_files:
@@ -95,10 +94,10 @@
     execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
   tasks:
-    - name: "(repository_update) Regenerate API endpoints after report transfer"
-      include_tasks: roles/repository_manager/tasks/generate_api_endpoints.yml
+    - name: "(repository_final_update) Force regeneration of all indexes and APIs"
+      include_tasks: roles/repository_manager/tasks/generate_indexes.yml
       when: use_repository_manager | bool
-      tags: [repository, api_update]
+      tags: [repository, final_update, indexes]
 
 - name: "Send Notifications"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"

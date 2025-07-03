@@ -17,8 +17,8 @@
     {
       "timestamp": "{{ timestamp }}",
       "url": "/{{ format_type }}/{{ timestamp }}/",
-      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}",
-      "iso_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\1-\\2-\\3T\\4:\\5:\\6Z') }}"
+      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}",
+      "iso_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})', '\\1-\\2-\\3T\\4:\\5:\\6Z') }}"
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ],
