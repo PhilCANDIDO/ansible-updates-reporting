@@ -235,7 +235,7 @@
             </div>
             <div class="info-card">
                 <h4>Uptime</h4>
-                <p>{{ (item.uptime_seconds | int / 86400) | round(1) }} days</p>
+                <p>{{ ((item.uptime_seconds | int) / 86400) | round(1) }} days</p>
             </div>
             <div class="info-card">
                 <h4>Collection Method</h4>
@@ -253,9 +253,10 @@
             
             <!-- Alert based on status -->
             {% if item.status == 'success' %}
-                {% if item.security_updates > 0 %}
+                {% set security_count = item.security_updates | int %}
+                {% if security_count > 0 %}
                 <div class="alert alert-{{ 'danger' if item.critical_level == 'HIGH' else 'warning' }}">
-                    <strong>⚠️ Action Required:</strong> This host has {{ item.security_updates }} security update(s) available.
+                    <strong>⚠️ Action Required:</strong> This host has {{ security_count }} security update(s) available.
                     {% if item.requires_reboot %}A system reboot will be required after applying updates.{% endif %}
                 </div>
                 {% else %}
@@ -271,11 +272,11 @@
 
             <div class="status-grid">
                 <div class="status-card">
-                    <div class="status-number" style="color: #6f42c1;">{{ item.total_updates }}</div>
+                    <div class="status-number" style="color: #6f42c1;">{{ item.total_updates | int }}</div>
                     <div class="status-label">Total Updates</div>
                 </div>
                 <div class="status-card">
-                    <div class="status-number" style="color: #dc3545;">{{ item.security_updates }}</div>
+                    <div class="status-number" style="color: #dc3545;">{{ item.security_updates | int }}</div>
                     <div class="status-label">Security Updates</div>
                 </div>
                 <div class="status-card">
