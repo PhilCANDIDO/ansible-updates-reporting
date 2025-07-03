@@ -272,15 +272,15 @@
                         </div>
 
                         <div class="report-actions">
-                            <a :href="'{{ format_type }}/' + report.timestamp + '/'" class="action-btn btn-primary">
+                            <a :href="report.timestamp + '/'" class="action-btn btn-primary" @click.stop>
                                 📁 Browse Files
                             </a>
                             {% if format_type == 'html' %}
-                            <a :href="'{{ format_type }}/' + report.timestamp + '/consolidated_report_' + report.execution_id + '.html'" class="action-btn btn-secondary">
+                            <a :href="report.timestamp + '/consolidated_report_' + report.execution_id + '.html'" class="action-btn btn-secondary" @click.stop>
                                 📊 View Report
                             </a>
                             {% elif format_type == 'json' %}
-                            <a :href="'{{ format_type }}/' + report.timestamp + '/consolidated_report_' + report.execution_id + '.json'" class="action-btn btn-secondary">
+                            <a :href="report.timestamp + '/consolidated_report_' + report.execution_id + '.json'" class="action-btn btn-secondary" @click.stop>
                                 📄 View JSON
                             </a>
                             {% endif %}
@@ -309,36 +309,39 @@
                     this.error = null;
                     
                     try {
-                        // Dans un vrai environnement, ceci ferait un appel AJAX
-                        // Pour l'instant, nous simulons avec des données statiques
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // Récupérer les données depuis l'API du format
+                        const response = await fetch('/{{ format_type }}/api.json');
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch API data: ${response.status}`);
+                        }
                         
-                        // Simulation de données - en production, ceci viendrait d'une API
-                        this.reports = await this.fetchReportsFromDirectory();
+                        const apiData = await response.json();
+                        
+                        // Transformer les timestamps en objets avec métadonnées
+                        this.reports = apiData.available_timestamps.map(item => ({
+                            timestamp: item.timestamp,
+                            execution_id: item.timestamp.replace('T', ''),  // Utiliser le timestamp comme execution_id de base
+                            formatted_date: item.formatted_date,
+                            summary: {
+                                total_hosts: 0,  // Ces données ne sont pas disponibles dans l'API
+                                total_updates: 0,
+                                security_updates: 0,
+                                critical_hosts: 0
+                            }
+                        }));
+                        
                         this.filteredReports = [...this.reports];
                         
                     } catch (err) {
+                        console.error('Error loading reports:', err);
                         this.error = 'Failed to load reports: ' + err.message;
+                        
+                        // Fallback: essayer de charger des données statiques
+                        this.reports = [];
+                        this.filteredReports = [];
                     } finally {
                         this.loading = false;
                     }
-                },
-
-                async fetchReportsFromDirectory() {
-                    // Simulation - en production, ceci utiliserait une API ou analyserait le DOM
-                    return [
-                        {
-                            timestamp: '20250703160449',
-                            execution_id: '20250703T160449',
-                            summary: {
-                                total_hosts: 4,
-                                total_updates: 477,
-                                security_updates: 72,
-                                critical_hosts: 1
-                            }
-                        }
-                        // Ajoutez d'autres rapports ici au fur et à mesure
-                    ];
                 },
 
                 filterReports() {
@@ -351,12 +354,25 @@
                     this.filteredReports = this.reports.filter(report => 
                         report.timestamp.toLowerCase().includes(term) ||
                         report.execution_id.toLowerCase().includes(term) ||
-                        this.formatDate(report.timestamp).toLowerCase().includes(term)
+                        report.formatted_date.toLowerCase().includes(term)
                     );
                 },
 
                 formatDate(timestamp) {
-                    // Format: YYYYMMDDhhmmss -> readable date
+                    // Format: YYYYMMDDThhmmss → readable date
+                    if (timestamp.includes('T')) {
+                        const [date, time] = timestamp.split('T');
+                        const year = date.substring(0, 4);
+                        const month = date.substring(4, 6);
+                        const day = date.substring(6, 8);
+                        const hour = time.substring(0, 2);
+                        const minute = time.substring(2, 4);
+                        const second = time.substring(4, 6);
+                        
+                        return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+                    }
+                    
+                    // Fallback pour l'ancien format
                     const year = timestamp.substring(0, 4);
                     const month = timestamp.substring(4, 6);
                     const day = timestamp.substring(6, 8);
@@ -368,7 +384,8 @@
                 },
 
                 openReport(report) {
-                    window.location.href = `{{ format_type }}/${report.timestamp}/`;
+                    // Naviguer vers le répertoire du timestamp (chemin relatif)
+                    window.location.href = report.timestamp + '/';
                 }
             }
         }
