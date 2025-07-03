@@ -1,0 +1,45 @@
+{
+  "index_metadata": {
+    "index_version": "1.0",
+    "last_updated": "{{ ansible_date_time.iso8601 }}",
+    "total_executions": 1,
+    "latest_execution_id": "{{ execution_id }}"
+  },
+  "latest_reports": {
+    "consolidated_report": "consolidated_report_{{ execution_id }}.json",
+    "execution_id": "{{ execution_id }}",
+    "generation_timestamp": "{{ ansible_date_time.iso8601 }}",
+    "total_hosts": {{ aggregated_data.summary.total_hosts | int }},
+    "total_updates": {{ aggregated_data.summary.total_updates | int }},
+    "security_updates": {{ aggregated_data.summary.total_security_updates | int }},
+    "critical_hosts": {{ aggregated_data.critical_hosts | length | int }}
+  },
+  "available_reports": {
+    "consolidated": [
+      "consolidated_report_{{ execution_id }}.json"
+    ],
+    "individual_hosts": [
+      {% for host in aggregated_data.hosts %}
+      "{{ host.hostname }}_{{ execution_id }}.json"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ]{% if aggregated_data.errors | length > 0 %},
+    "errors": [
+      "errors_{{ execution_id }}.json"
+    ]{% endif %}
+  },
+  "api_endpoints": {
+    "consolidated_report": "/json/consolidated_report_{{ execution_id }}.json",
+    "host_reports": "/json/{hostname}_{{ execution_id }}.json",
+    "errors_report": "/json/errors_{{ execution_id }}.json"
+  },
+  "summary_statistics": {
+    "hosts_processed": {{ aggregated_data.hosts | length | int }},
+    "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
+    "success_rate_percentage": {{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
+    "priority_distribution": {
+      "high": {{ aggregated_data.hosts | selectattr('critical_level', 'equalto', 'HIGH') | list | length }},
+      "medium": {{ aggregated_data.hosts | selectattr('critical_level', 'equalto', 'MEDIUM') | list | length }},
+      "low": {{ aggregated_data.hosts | selectattr('critical_level', 'equalto', 'LOW') | list | length }}
+    }
+  }
+}

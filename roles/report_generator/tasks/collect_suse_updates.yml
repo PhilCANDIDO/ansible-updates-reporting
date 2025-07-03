@@ -1,0 +1,52 @@
+---
+- name: "(collect_suse_updates) Check if zypper is available"
+  command: which zypper
+  register: zypper_check
+  failed_when: false
+  changed_when: false
+  tags: [suse, package_manager]
+
+- name: "(collect_suse_updates) Fail if zypper is not available"
+  fail:
+    msg: "zypper package manager not found on SUSE system"
+  when: zypper_check.rc != 0
+  tags: [suse, validation]
+
+- name: "(collect_suse_updates) Refresh package repositories"
+  command: zypper refresh
+  register: zypper_refresh
+  changed_when: false
+  failed_when: zypper_refresh.rc not in [0, 4]
+  tags: [suse, refresh]
+
+- name: "(collect_suse_updates) Get list of available updates"
+  shell: |
+    zypper list-updates --no-color | grep '^v\|^i' | grep -v '^Repository'
+  register: suse_updates_raw
+  changed_when: false
+  failed_when: false
+  tags: [suse, package_list]
+
+- name: "(collect_suse_updates) Get security updates count"
+  shell: |
+    zypper list-patches --category security --no-color | grep -c '^Patch' || echo "0"
+  register: suse_security_count
+  changed_when: false
+  failed_when: false
+  tags: [suse, security_updates]
+
+- name: "(collect_suse_updates) Parse available updates"
+  set_fact:
+    suse_updates: "{{ suse_updates_raw.stdout_lines | default([]) | suse_parse_updates }}"
+    suse_security_updates_count: "{{ suse_security_count.stdout | int }}"
+  tags: [suse, parsing]
+
+- name: "(collect_suse_updates) Set collected updates for this host"
+  set_fact:
+    collected_updates:
+      total_count: "{{ suse_updates | length }}"
+      security_count: "{{ suse_security_updates_count }}"
+      packages: "{{ suse_updates }}"
+      collection_method: "zypper"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+  tags: [suse, results]

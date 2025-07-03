@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Updates Summary</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        /* Outlook-compatible styles */
+        body, table, td, p, a, li, blockquote {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        table, td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            height: auto;
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }
+        
+        /* Reset styles */
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        /* Container */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        
+        /* Header */
+        .header {
+            background-color: #2c3e50;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: normal;
+        }
+        .header p {
+            color: #ecf0f1;
+            margin: 10px 0 0 0;
+            font-size: 14px;
+        }
+        
+        /* Priority Badge */
+        .priority-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 15px;
+            color: #ffffff;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .priority-high { background-color: #e74c3c; }
+        .priority-medium { background-color: #f39c12; }
+        .priority-low { background-color: #27ae60; }
+        
+        /* Content sections */
+        .content-section {
+            padding: 20px;
+        }
+        
+        /* Statistics table */
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .stats-table td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+            vertical-align: top;
+        }
+        .stats-label {
+            font-weight: bold;
+            color: #2c3e50;
+            width: 40%;
+        }
+        .stats-value {
+            color: #34495e;
+            text-align: right;
+            font-size: 16px;
+        }
+        .stats-value.highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        /* Hosts table */
+        .hosts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            border: 1px solid #bdc3c7;
+        }
+        .hosts-table th {
+            background-color: #34495e;
+            color: #ffffff;
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 12px;
+            border: 1px solid #2c3e50;
+        }
+        .hosts-table td {
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            font-size: 12px;
+        }
+        .hosts-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* Priority cells */
+        .priority-cell-high {
+            background-color: #e74c3c;
+            color: #ffffff;
+            text-align: center;
+            font-weight: bold;
+        }
+        .priority-cell-medium {
+            background-color: #f39c12;
+            color: #ffffff;
+            text-align: center;
+            font-weight: bold;
+        }
+        .priority-cell-low {
+            background-color: #27ae60;
+            color: #ffffff;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        /* Action section */
+        .action-section {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-left: 4px solid #3498db;
+        }
+        .action-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        
+        /* Critical section */
+        .critical-section {
+            background-color: #fadbd8;
+            padding: 20px;
+            border-left: 4px solid #e74c3c;
+        }
+        .critical-section h3 {
+            color: #c0392b;
+            margin-top: 0;
+        }
+        
+        /* Footer */
+        .footer {
+            background-color: #34495e;
+            color: #ecf0f1;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .hosts-table {
+                font-size: 10px;
+            }
+            .hosts-table th,
+            .hosts-table td {
+                padding: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔄 System Updates Report</h1>
+            <p>Execution ID: {{ execution_id }}</p>
+            <p>{{ ansible_date_time.iso8601 }}</p>
+            {% set sec_count = aggregated_data.summary.total_security_updates | int %}
+            {% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}
+            <div class="priority-badge priority-{{ 'high' if sec_count > crit_threshold else ('medium' if sec_count > 0 else 'low') }}">
+                {{ 'HIGH PRIORITY' if sec_count > crit_threshold else ('MEDIUM PRIORITY' if sec_count > 0 else 'LOW PRIORITY') }}
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="content-section">
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">📊 Executive Summary</h2>
+            <table class="stats-table">
+                <tr>
+                    <td class="stats-label">Total Hosts Scanned:</td>
+                    <td class="stats-value">{{ aggregated_data.summary.total_hosts }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Hosts Processed Successfully:</td>
+                    <td class="stats-value">{{ aggregated_data.hosts | length }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Total Updates Available:</td>
+                    <td class="stats-value">{{ aggregated_data.summary.total_updates }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Security Updates:</td>
+                    <td class="stats-value highlight">{{ aggregated_data.summary.total_security_updates }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Hosts Requiring Reboot:</td>
+                    <td class="stats-value">{{ aggregated_data.summary.hosts_requiring_reboot }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Hosts with Errors:</td>
+                    <td class="stats-value">{{ aggregated_data.summary.hosts_with_errors }}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">Success Rate:</td>
+                    <td class="stats-value">{{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(1) }}%</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Critical Hosts Alert -->
+        {% if aggregated_data.critical_hosts | length > 0 %}
+        <div class="critical-section">
+            <h3>🚨 Critical Priority Hosts ({{ aggregated_data.critical_hosts | length }})</h3>
+            <p>The following hosts require immediate attention due to high security update counts:</p>
+            <table class="hosts-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>Security Updates</th>
+                        <th>Total Updates</th>
+                        <th>Reboot Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in aggregated_data.critical_hosts %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td class="priority-cell-high">{{ host.security_updates }}</td>
+                        <td>{{ host.total_updates }}</td>
+                        <td>{{ '✓' if host.requires_reboot else '✗' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- All Hosts Summary -->
+        <div class="content-section">
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">🖥️ All Hosts Summary</h2>
+            <table class="hosts-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>OS</th>
+                        <th>Security</th>
+                        <th>Total</th>
+                        <th>Priority</th>
+                        <th>Reboot</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in aggregated_data.hosts[:10] %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.distribution }}</td>
+                        <td>{{ host.security_updates }}</td>
+                        <td>{{ host.total_updates }}</td>
+                        <td class="priority-cell-{{ host.critical_level | lower }}">{{ host.critical_level }}</td>
+                        <td>{{ '✓' if host.requires_reboot else '✗' }}</td>
+                        <td>{{ '✓' if host.status == 'success' else '✗' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if aggregated_data.hosts | length > 10 %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; font-style: italic; color: #7f8c8d;">
+                            ... and {{ aggregated_data.hosts | length - 10 }} more hosts (see full report for details)
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Action Required -->
+        <div class="action-section">
+            <h3>📋 Recommended Actions</h3>
+            {% if sec_count > crit_threshold %}
+            <p><strong>⚠️ IMMEDIATE ACTION REQUIRED:</strong></p>
+            <ul>
+                <li>{{ sec_count }} security updates detected across the infrastructure</li>
+                <li>{{ aggregated_data.critical_hosts | length }} hosts are in critical priority status</li>
+                <li>Schedule emergency maintenance window for critical security patches</li>
+                <li>Review and test security updates in staging environment</li>
+            </ul>
+            {% elif sec_count > 0 %}
+            <p><strong>⚠️ MAINTENANCE RECOMMENDED:</strong></p>
+            <ul>
+                <li>{{ sec_count }} security updates available</li>
+                <li>Schedule maintenance window within next 7 days</li>
+                <li>Review change management procedures</li>
+            </ul>
+            {% else %}
+            <p><strong>✅ SYSTEM STATUS GOOD:</strong></p>
+            <ul>
+                <li>No critical security updates detected</li>
+                <li>Continue regular maintenance schedule</li>
+                <li>Monitor for new security advisories</li>
+            </ul>
+            {% endif %}
+            
+            {% if aggregated_data.summary.hosts_requiring_reboot > 0 %}
+            <p><strong>🔄 REBOOT PLANNING:</strong></p>
+            <ul>
+                <li>{{ aggregated_data.summary.hosts_requiring_reboot }} hosts will require reboot after updates</li>
+                <li>Plan for service interruption and coordinate with stakeholders</li>
+            </ul>
+            {% endif %}
+        </div>
+
+        <!-- Errors Section -->
+        {% if aggregated_data.errors | length > 0 %}
+        <div class="content-section" style="background-color: #fdf2e9; border-left: 4px solid #e67e22;">
+            <h3 style="color: #d35400;">⚠️ Collection Errors ({{ aggregated_data.errors | length }})</h3>
+            <p>The following hosts encountered errors during data collection:</p>
+            <ul>
+                {% for error in aggregated_data.errors %}
+                <li><strong>{{ error.hostname }}</strong>: {{ error.error_type }} - {{ error.error_message[:100] }}{% if error.error_message | length > 100 %}...{% endif %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Ansible Updates Reporting System</strong></p>
+            <p>This is an automated report. For technical support, contact the Operations Team.</p>
+            <p>Report generated on {{ ansible_date_time.iso8601 }}</p>
+        </div>
+    </div>
+</body>
+</html>

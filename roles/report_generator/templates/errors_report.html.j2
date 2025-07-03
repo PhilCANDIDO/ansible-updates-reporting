@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Errors Report - {{ execution_id }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header-info {
+            margin-top: 15px;
+            opacity: 0.9;
+        }
+        .summary-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            border-left: 4px solid #e74c3c;
+        }
+        .summary-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 5px;
+        }
+        .summary-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        .section {
+            padding: 30px;
+        }
+        .section h2 {
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+        .errors-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .errors-table th {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 0.5px;
+        }
+        .errors-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+        .errors-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .errors-table tr:hover {
+            background: #ffebee;
+        }
+        .error-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .error-unreachable {
+            background: #dc3545;
+            color: white;
+        }
+        .error-collection-failed {
+            background: #fd7e14;
+            color: white;
+        }
+        .error-timeout {
+            background: #6f42c1;
+            color: white;
+        }
+        .recommendations {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .recommendations h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .recommendations ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .recommendations li {
+            margin-bottom: 8px;
+        }
+        .footer {
+            background: #343a40;
+            color: white;
+            text-align: center;
+            padding: 25px;
+        }
+        .timestamp {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .hostname {
+            font-weight: bold;
+            color: #495057;
+        }
+        .error-message {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #dc3545;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+            .errors-table {
+                font-size: 0.9em;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>⚠️ Collection Errors Report</h1>
+            <div class="header-info">
+                <p><strong>Execution ID:</strong> {{ execution_id }}</p>
+                <p><strong>Generated:</strong> {{ ansible_date_time.iso8601 }}</p>
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="summary-section">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-number">{{ aggregated_data.summary.total_hosts }}</div>
+                    <div class="summary-label">Total Hosts</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">{{ aggregated_data.summary.hosts_with_errors }}</div>
+                    <div class="summary-label">Hosts with Errors</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">{{ ((aggregated_data.summary.hosts_with_errors | float / aggregated_data.summary.total_hosts | float) * 100) | round(1) }}%</div>
+                    <div class="summary-label">Error Rate</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">{{ aggregated_data.errors | selectattr('error_type', 'equalto', 'unreachable') | list | length }}</div>
+                    <div class="summary-label">Unreachable</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Details -->
+        <div class="section">
+            <h2>🔍 Error Details</h2>
+            
+            {% if aggregated_data.errors | length > 0 %}
+            <table class="errors-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>Error Type</th>
+                        <th>Error Message</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for error in aggregated_data.errors %}
+                    <tr>
+                        <td class="hostname">{{ error.hostname }}</td>
+                        <td>
+                            <span class="error-type error-{{ error.error_type | replace('_', '-') }}">
+                                {{ error.error_type | replace('_', ' ') | title }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="error-message">{{ error.error_message }}</div>
+                        </td>
+                        <td class="timestamp">{{ error.timestamp }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #6c757d;">
+                <p>No errors detected during this execution.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Error Type Analysis -->
+        <div class="section">
+            <h2>📈 Error Type Analysis</h2>
+            
+            {% set unreachable_errors = aggregated_data.errors | selectattr('error_type', 'equalto', 'unreachable') | list %}
+            {% set collection_errors = aggregated_data.errors | selectattr('error_type', 'equalto', 'collection_failed') | list %}
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px;">
+                    <h4 style="color: #dc3545; margin-top: 0;">🔌 Unreachable Hosts ({{ unreachable_errors | length }})</h4>
+                    {% if unreachable_errors | length > 0 %}
+                    <ul>
+                        {% for error in unreachable_errors %}
+                        <li>{{ error.hostname }}</li>
+                        {% endfor %}
+                    </ul>
+                    <p><strong>Common causes:</strong> Network connectivity issues, SSH service down, firewall blocking, incorrect credentials.</p>
+                    {% else %}
+                    <p>No unreachable hosts detected.</p>
+                    {% endif %}
+                </div>
+                
+                <div style="background: white; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px;">
+                    <h4 style="color: #fd7e14; margin-top: 0;">📦 Collection Failed ({{ collection_errors | length }})</h4>
+                    {% if collection_errors | length > 0 %}
+                    <ul>
+                        {% for error in collection_errors %}
+                        <li>{{ error.hostname }}</li>
+                        {% endfor %}
+                    </ul>
+                    <p><strong>Common causes:</strong> Package manager issues, insufficient permissions, corrupted package database.</p>
+                    {% else %}
+                    <p>No collection failures detected.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="section">
+            <div class="recommendations">
+                <h3>💡 Troubleshooting Recommendations</h3>
+                <ul>
+                    {% if unreachable_errors | length > 0 %}
+                    <li><strong>For unreachable hosts:</strong>
+                        <ul>
+                            <li>Verify network connectivity with ping or telnet</li>
+                            <li>Check SSH service status on target hosts</li>
+                            <li>Validate SSH keys and authentication methods</li>
+                            <li>Review firewall rules and security groups</li>
+                            <li>Confirm correct IP addresses and hostnames in inventory</li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    {% if collection_errors | length > 0 %}
+                    <li><strong>For collection failures:</strong>
+                        <ul>
+                            <li>Check package manager functionality (apt, yum, dnf, zypper)</li>
+                            <li>Verify user permissions for package operations</li>
+                            <li>Update package cache/metadata manually</li>
+                            <li>Check disk space in /var and /tmp directories</li>
+                            <li>Review system logs for package manager errors</li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    <li><strong>General recommendations:</strong>
+                        <ul>
+                            <li>Increase SSH timeout values for slow networks</li>
+                            <li>Consider running with higher verbosity (-vvv) for detailed error information</li>
+                            <li>Check system load and available resources on target hosts</li>
+                            <li>Validate Ansible configuration and inventory syntax</li>
+                            <li>Test connectivity manually before automated runs</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="section">
+            <h2>📋 Next Steps</h2>
+            <div style="background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 8px; padding: 20px;">
+                <ol>
+                    <li><strong>Immediate Actions:</strong>
+                        <ul>
+                            <li>Address unreachable hosts to ensure complete infrastructure coverage</li>
+                            <li>Investigate collection failures to prevent data gaps</li>
+                            <li>Update inventory if any hosts have changed IP addresses or access methods</li>
+                        </ul>
+                    </li>
+                    <li><strong>Preventive Measures:</strong>
+                        <ul>
+                            <li>Implement monitoring for SSH connectivity across all managed hosts</li>
+                            <li>Regular validation of Ansible inventory accuracy</li>
+                            <li>Automated health checks for package manager functionality</li>
+                            <li>Documentation of known issues and their resolutions</li>
+                        </ul>
+                    </li>
+                    <li><strong>Process Improvements:</strong>
+                        <ul>
+                            <li>Consider implementing retry logic for transient failures</li>
+                            <li>Add pre-flight connectivity checks before main execution</li>
+                            <li>Establish escalation procedures for persistent errors</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Errors Report</strong></p>
+            <p>Generated by Ansible Updates Reporting System</p>
+            <p>For technical support, contact the Operations Team</p>
+            <p>Report generated on {{ ansible_date_time.iso8601 }}</p>
+        </div>
+    </div>
+</body>
+</html>

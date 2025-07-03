@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consolidated System Updates Report - {{ execution_id }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header-info {
+            margin-top: 15px;
+            opacity: 0.9;
+        }
+        .priority-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .priority-high { background: #dc3545; }
+        .priority-medium { background: #ffc107; color: #212529; }
+        .priority-low { background: #28a745; }
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .section {
+            padding: 30px;
+        }
+        .section h2 {
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+        .hosts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .hosts-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 0.5px;
+        }
+        .hosts-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .hosts-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .hosts-table tr:hover {
+            background: #e3f2fd;
+        }
+        .status-success { color: #28a745; font-weight: bold; }
+        .status-error { color: #dc3545; font-weight: bold; }
+        .status-warning { color: #ffc107; font-weight: bold; }
+        .critical-high { 
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .critical-medium { 
+            background: linear-gradient(135deg, #feca57, #ff9ff3);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .critical-low { 
+            background: linear-gradient(135deg, #48dbfb, #0abde3);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .os-distribution {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .os-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        .os-card h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        .error-section {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .error-section h3 {
+            color: #721c24;
+            margin-top: 0;
+        }
+        .footer {
+            background: #343a40;
+            color: white;
+            text-align: center;
+            padding: 25px;
+        }
+        .timestamp {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        @media (max-width: 768px) {
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+            .hosts-table {
+                font-size: 0.9em;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+            .header { background: #667eea !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Consolidated System Updates Report</h1>
+            <div class="header-info">
+                <p><strong>Execution ID:</strong> {{ execution_id }}</p>
+                <p><strong>Generated:</strong> {{ ansible_date_time.iso8601 }}</p>
+                {% set sec_count = aggregated_data.summary.total_security_updates | int %}
+                {% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}
+                <div class="priority-badge priority-{{ 'high' if sec_count > crit_threshold else ('medium' if sec_count > 0 else 'low') }}">
+                    {{ 'HIGH PRIORITY' if sec_count > crit_threshold else ('MEDIUM PRIORITY' if sec_count > 0 else 'LOW PRIORITY') }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-number" style="color: #17a2b8;">{{ aggregated_data.summary.total_hosts }}</div>
+                <div class="stat-label">Total Hosts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #6f42c1;">{{ aggregated_data.summary.total_updates }}</div>
+                <div class="stat-label">Total Updates</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #dc3545;">{{ aggregated_data.summary.total_security_updates }}</div>
+                <div class="stat-label">Security Updates</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #fd7e14;">{{ aggregated_data.summary.hosts_requiring_reboot }}</div>
+                <div class="stat-label">Require Reboot</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #28a745;">{{ aggregated_data.hosts | length }}</div>
+                <div class="stat-label">Successful</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #dc3545;">{{ aggregated_data.summary.hosts_with_errors }}</div>
+                <div class="stat-label">Errors</div>
+            </div>
+        </div>
+
+        <!-- Critical Hosts Section -->
+        {% if aggregated_data.critical_hosts | length > 0 %}
+        <div class="section">
+            <h2>🚨 Critical Priority Hosts</h2>
+            <table class="hosts-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>IP Address</th>
+                        <th>Operating System</th>
+                        <th>Security Updates</th>
+                        <th>Total Updates</th>
+                        <th>Reboot Required</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in aggregated_data.critical_hosts %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.ip_address }}</td>
+                        <td>{{ host.distribution }} {{ host.version }}</td>
+                        <td><span class="critical-high">{{ host.security_updates }}</span></td>
+                        <td>{{ host.total_updates }}</td>
+                        <td>{{ '✅ Yes' if host.requires_reboot else '❌ No' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- All Hosts Section -->
+        <div class="section">
+            <h2>🖥️ All Hosts Status</h2>
+            <table class="hosts-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>FQDN</th>
+                        <th>Operating System</th>
+                        <th>Architecture</th>
+                        <th>Security Updates</th>
+                        <th>Total Updates</th>
+                        <th>Priority</th>
+                        <th>Reboot</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in aggregated_data.hosts %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.fqdn }}</td>
+                        <td>{{ host.distribution }} {{ host.version }}</td>
+                        <td>{{ host.architecture }}</td>
+                        <td>{{ host.security_updates }}</td>
+                        <td>{{ host.total_updates }}</td>
+                        <td>
+                            <span class="critical-{{ host.critical_level | lower }}">{{ host.critical_level }}</span>
+                        </td>
+                        <td>{{ '✅' if host.requires_reboot else '❌' }}</td>
+                        <td>
+                            <span class="status-{{ 'success' if host.status == 'success' else 'error' }}">
+                                {{ '✅ OK' if host.status == 'success' else '❌ ERROR' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- OS Distribution -->
+        <div class="section">
+            <h2>🐧 Operating Systems Distribution</h2>
+            <div class="os-distribution">
+                {% for os_name, hosts_list in aggregated_data.by_os_family.items() %}
+                <div class="os-card">
+                    <h4>{{ os_name }}</h4>
+                    <p><strong>{{ hosts_list | length }}</strong> hosts</p>
+                    <p>{{ hosts_list | map(attribute='total_updates') | sum }} updates</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Errors Section -->
+        {% if aggregated_data.errors | length > 0 %}
+        <div class="section">
+            <div class="error-section">
+                <h3>⚠️ Collection Errors ({{ aggregated_data.errors | length }})</h3>
+                <table class="hosts-table">
+                    <thead>
+                        <tr>
+                            <th>Hostname</th>
+                            <th>Error Type</th>
+                            <th>Error Message</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for error in aggregated_data.errors %}
+                        <tr>
+                            <td>{{ error.hostname }}</td>
+                            <td><span class="status-error">{{ error.error_type }}</span></td>
+                            <td>{{ error.error_message }}</td>
+                            <td class="timestamp">{{ error.timestamp }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Ansible Updates Reporting System</strong></p>
+            <p>Success Rate: {{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(1) }}% | 
+               Generated: {{ ansible_date_time.iso8601 }}</p>
+        </div>
+    </div>
+</body>
+</html>

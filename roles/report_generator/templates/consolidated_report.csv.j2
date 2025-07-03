@@ -1,0 +1,4 @@
+Hostname,FQDN,IP Address,Distribution,Version,Architecture,Total Updates,Security Updates,Critical Level,Requires Reboot,Collection Method,Status,Error Message
+{% for host in aggregated_data.hosts -%}
+{{ host.hostname }},"{{ host.fqdn }}","{{ host.ip_address }}","{{ host.distribution }}","{{ host.version }}","{{ host.architecture }}",{{ host.total_updates }},{{ host.security_updates }},"{{ host.critical_level }}",{{ host.requires_reboot }},"{{ host.collection_method }}","{{ host.status }}","{{ host.error_message | default('') | regex_replace('"', '""') }}"
+{% endfor %}
