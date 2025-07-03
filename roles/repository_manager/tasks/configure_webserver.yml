@@ -6,15 +6,6 @@
   become: true
   tags: [setup, webserver, packages]
 
-- name: "(configure_webserver) Install Python dependencies for Excel generation"
-  pip:
-    name:
-      - openpyxl
-      - pandas
-    state: present
-  become: true
-  tags: [setup, packages, python]
-
 - name: "(configure_webserver) Enable Apache modules (Debian/Ubuntu)"
   apache2_module:
     name: "{{ item }}"
