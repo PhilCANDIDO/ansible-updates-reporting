@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 
 def debian_parse_updates(package_lines):
-    """Parse Debian/Ubuntu package update lines - Version corrigée et renforcée"""
+    """Parse Debian/Ubuntu package update lines - Version de base"""
     packages = []
     
     for line in package_lines:
         line = line.strip()
-        if not line or line.startswith('Listing') or line.startswith('WARNING'):
+        
+        # Ignorer les lignes vides, d'en-tête et d'avertissement
+        if not line or any(skip in line for skip in [
+            'Listing', 'En train de lister', 'WARNING', 'AVERTISSEMENT',
+            'Last metadata', 'Loaded plugins'
+        ]):
             continue
             
         # Format attendu: package_name/repository version [upgradable from: current_version]
-        if '/' in line and '[upgradable from:' in line:
+        # Ou format français: package_name/repository version [pouvant être mis à jour depuis : current_version]
+        if ('/' in line and 
+            ('[upgradable from:' in line or '[pouvant être mis à jour depuis :' in line)):
             try:
                 # Séparer le nom du package et le reste
                 parts = line.split('/', 1)
@@ -20,30 +27,25 @@ def debian_parse_updates(package_lines):
                 package_name = parts[0].strip()
                 rest = parts[1].strip()
                 
-                # Extraire la version disponible (premier élément après le repository)
-                rest_parts = rest.split(' ')
-                if len(rest_parts) < 1:
+                # Extraire la version disponible et le repository
+                rest_parts = rest.split()
+                if len(rest_parts) < 2:
                     continue
                     
-                # Le repository peut contenir des espaces, donc on cherche la version
-                version_new = 'unknown'
-                repository = 'unknown'
+                repository = rest_parts[0]
+                version_new = rest_parts[1]
                 
-                # Chercher la version dans les premiers éléments
-                for i, part in enumerate(rest_parts):
-                    if part and not part.startswith('['):
-                        if i == 0:
-                            repository = part
-                        elif version_new == 'unknown':
-                            version_new = part
-                            break
-                
-                # Extraire la version actuelle
+                # Extraire la version actuelle (support français et anglais)
                 version_current = 'unknown'
                 if '[upgradable from:' in line:
                     current_part = line.split('[upgradable from: ')[1]
-                    if ']' in current_part:
-                        version_current = current_part.split(']')[0].strip()
+                elif '[pouvant être mis à jour depuis :' in line:
+                    current_part = line.split('[pouvant être mis à jour depuis : ')[1]
+                else:
+                    current_part = ''
+                
+                if ']' in current_part:
+                    version_current = current_part.split(']')[0].strip()
                 
                 # Détection renforcée des mises à jour de sécurité
                 line_lower = line.lower()
@@ -83,11 +85,10 @@ def debian_parse_updates(package_lines):
                 
                 # Extraire l'architecture si présente
                 architecture = 'unknown'
-                if ' ' in rest:
-                    for part in rest_parts:
-                        if part in ['amd64', 'i386', 'arm64', 'armhf', 'all']:
-                            architecture = part
-                            break
+                for part in rest_parts:
+                    if part in ['amd64', 'i386', 'arm64', 'armhf', 'all']:
+                        architecture = part
+                        break
                 
                 package = {
                     'name': package_name,
@@ -104,13 +105,129 @@ def debian_parse_updates(package_lines):
                 
             except Exception as e:
                 # En cas d'erreur de parsing, on continue avec le package suivant
-                # mais on peut logger l'erreur pour debugging
                 continue
     
     return packages
 
+def debian_parse_updates_improved(package_lines):
+    """Alias pour la version améliorée - identique à debian_parse_updates"""
+    return debian_parse_updates(package_lines)
+
+def debian_parse_apt_get_sim(package_lines):
+    """Parse la sortie de 'apt-get upgrade -s' (simulation)"""
+    packages = []
+    
+    for line in package_lines:
+        line = line.strip()
+        
+        if not line or not line.startswith('Inst '):
+            continue
+            
+        try:
+            # Format: Inst package_name [current_version] (new_version repository [architecture])
+            # Enlever 'Inst ' du début
+            line = line[5:]  # Remove 'Inst '
+            
+            # Séparer le nom du package du reste
+            parts = line.split(' ', 1)
+            if len(parts) < 2:
+                continue
+                
+            package_name = parts[0]
+            rest = parts[1]
+            
+            # Extraire les versions et le repository
+            current_version = 'unknown'
+            new_version = 'unknown'
+            repository = 'unknown'
+            architecture = 'unknown'
+            
+            # Pattern de parsing pour apt-get simulation
+            if '[' in rest and ']' in rest and '(' in rest and ')' in rest:
+                # Extraire la version actuelle entre []
+                if '[' in rest:
+                    current_start = rest.find('[') + 1
+                    current_end = rest.find(']')
+                    if current_end > current_start:
+                        current_version = rest[current_start:current_end]
+                
+                # Extraire la nouvelle version et repo entre ()
+                if '(' in rest:
+                    paren_start = rest.find('(') + 1
+                    paren_end = rest.find(')')
+                    if paren_end > paren_start:
+                        paren_content = rest[paren_start:paren_end]
+                        paren_parts = paren_content.split()
+                        if len(paren_parts) >= 2:
+                            new_version = paren_parts[0]
+                            repository = paren_parts[1]
+                            if len(paren_parts) > 2:
+                                architecture = paren_parts[2]
+            
+            # Détection de sécurité
+            is_security = 'security' in repository.lower()
+            
+            # Détection redémarrage
+            requires_reboot = any(
+                kernel in package_name.lower() 
+                for kernel in ['linux-', 'systemd', 'libc6']
+            )
+            
+            package = {
+                'name': package_name,
+                'current_version': current_version,
+                'available_version': new_version,
+                'is_security': is_security,
+                'repository': repository,
+                'architecture': architecture,
+                'requires_reboot': requires_reboot,
+                'raw_line': line
+            }
+            
+            packages.append(package)
+            
+        except Exception:
+            continue
+    
+    return packages
+
+def debian_enhance_security_detection(packages, security_lines):
+    """Améliore la détection de sécurité en croisant avec d'autres sources"""
+    enhanced_packages = []
+    
+    # Créer un set des packages de sécurité détectés dans security_lines
+    security_packages = set()
+    for line in security_lines:
+        if 'Inst ' in line:
+            try:
+                package_name = line.split('Inst ')[1].split()[0]
+                security_packages.add(package_name)
+            except:
+                continue
+    
+    for package in packages:
+        # Copier le package original
+        enhanced_package = package.copy()
+        
+        # Améliorer la détection de sécurité
+        if not package.get('is_security', False):
+            # Vérifier si le package est dans la liste des packages de sécurité
+            if package['name'] in security_packages:
+                enhanced_package['is_security'] = True
+            
+            # Vérifications supplémentaires
+            repo_lower = package.get('repository', '').lower()
+            if any(sec_term in repo_lower for sec_term in [
+                'security', 'stable-security', 'updates-security'
+            ]):
+                enhanced_package['is_security'] = True
+        
+        enhanced_packages.append(enhanced_package)
+    
+    return enhanced_packages
+
 def redhat_parse_updates(package_lines):
-    """Parse RedHat/CentOS/Rocky/Alma package update lines - Inchangé"""
+    """Parse RedHat/CentOS/Rocky/Alma package update lines"""
     packages = []
     for line in package_lines:
         if line.strip() and not line.startswith('Last metadata') and not line.startswith('Loaded plugins'):
@@ -141,7 +258,7 @@ def redhat_parse_updates(package_lines):
     return packages
 
 def suse_parse_updates(package_lines):
-    """Parse SUSE/OpenSUSE package update lines - Inchangé"""
+    """Parse SUSE/OpenSUSE package update lines"""
     packages = []
     for line in package_lines:
         if line.strip():
@@ -165,7 +282,7 @@ def suse_parse_updates(package_lines):
     return packages
 
 def extract_host_summary(host_data):
-    """Extract summary information for a host - Inchangé"""
+    """Extract summary information for a host"""
     return {
         'hostname': host_data.get('metadata', {}).get('hostname', 'unknown'),
         'fqdn': host_data.get('metadata', {}).get('fqdn', 'N/A'),
@@ -185,6 +302,9 @@ class FilterModule(object):
     def filters(self):
         return {
             'debian_parse_updates': debian_parse_updates,
+            'debian_parse_updates_improved': debian_parse_updates_improved,
+            'debian_parse_apt_get_sim': debian_parse_apt_get_sim,
+            'debian_enhance_security_detection': debian_enhance_security_detection,
             'redhat_parse_updates': redhat_parse_updates,
             'suse_parse_updates': suse_parse_updates,
             'extract_host_summary': extract_host_summary,
