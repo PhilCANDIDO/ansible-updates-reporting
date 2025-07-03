@@ -1,0 +1,121 @@
+---
+- name: "(process_host_data) Initialize host processing for {{ target_host }}"
+  set_fact:
+    current_host_data: {}
+    current_host_error: null
+  tags: [processing, initialization]
+
+- name: "(process_host_data) Check if host {{ target_host }} has collected updates"
+  set_fact:
+    host_has_updates: "{{ hostvars[target_host].collected_updates is defined }}"
+    host_reachable: "{{ hostvars[target_host].ansible_facts is defined }}"
+  tags: [processing, validation]
+
+- name: "(process_host_data) Process successful host {{ target_host }}"
+  set_fact:
+    current_host_data:
+      hostname: "{{ target_host }}"
+      fqdn: "{{ hostvars[target_host].ansible_fqdn | default('N/A') }}"
+      ip_address: "{{ hostvars[target_host].ansible_default_ipv4.address | default('N/A') }}"
+      distribution: "{{ hostvars[target_host].os_detection.distribution | default(hostvars[target_host].ansible_distribution | default('Unknown')) }}"
+      version: "{{ hostvars[target_host].os_detection.version | default(hostvars[target_host].ansible_distribution_version | default('Unknown')) }}"
+      architecture: "{{ hostvars[target_host].os_detection.architecture | default(hostvars[target_host].ansible_architecture | default('Unknown')) }}"
+      kernel: "{{ hostvars[target_host].ansible_kernel | default('N/A') }}"
+      uptime_seconds: "{{ hostvars[target_host].ansible_uptime_seconds | default(0) | int }}"
+      total_updates: "{{ hostvars[target_host].collected_updates.total_count | default(0) | int }}"
+      security_updates: "{{ hostvars[target_host].collected_updates.security_count | default(0) | int }}"
+      collection_method: "{{ hostvars[target_host].collected_updates.collection_method | default('unknown') }}"
+      collection_timestamp: "{{ hostvars[target_host].collected_updates.collection_timestamp | default(ansible_date_time.iso8601) }}"
+      requires_reboot: "{{ hostvars[target_host].collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0 }}"
+      critical_level: "{% set sec_count = hostvars[target_host].collected_updates.security_count | default(0) | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}"
+      packages: "{{ hostvars[target_host].collected_updates.packages | default([]) }}"
+      status: "success"
+  when: 
+    - host_reachable | bool
+    - host_has_updates | bool
+  tags: [processing, success]
+
+- name: "(process_host_data) Process host {{ target_host }} with collection errors"
+  set_fact:
+    current_host_data:
+      hostname: "{{ target_host }}"
+      fqdn: "{{ hostvars[target_host].ansible_fqdn | default('N/A') }}"
+      ip_address: "{{ hostvars[target_host].ansible_default_ipv4.address | default('N/A') }}"
+      distribution: "{{ hostvars[target_host].ansible_distribution | default('Unknown') }}"
+      version: "{{ hostvars[target_host].ansible_distribution_version | default('Unknown') }}"
+      architecture: "{{ hostvars[target_host].ansible_architecture | default('Unknown') }}"
+      kernel: "{{ hostvars[target_host].ansible_kernel | default('N/A') }}"
+      uptime_seconds: "{{ hostvars[target_host].ansible_uptime_seconds | default(0) | int }}"
+      total_updates: 0
+      security_updates: 0
+      collection_method: "failed"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+      requires_reboot: false
+      critical_level: "UNKNOWN"
+      packages: []
+      status: "error"
+      error_message: "Updates collection failed - host reachable but no updates data"
+    current_host_error:
+      hostname: "{{ target_host }}"
+      error_type: "collection_failed"
+      error_message: "Updates collection failed - host reachable but no updates data"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+  when: 
+    - host_reachable | bool
+    - not (host_has_updates | bool)
+  tags: [processing, collection_error]
+
+- name: "(process_host_data) Process unreachable host {{ target_host }}"
+  set_fact:
+    current_host_data:
+      hostname: "{{ target_host }}"
+      fqdn: "N/A"
+      ip_address: "N/A"
+      distribution: "Unknown"
+      version: "Unknown"
+      architecture: "Unknown"
+      kernel: "N/A"
+      uptime_seconds: 0
+      total_updates: 0
+      security_updates: 0
+      collection_method: "unreachable"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+      requires_reboot: false
+      critical_level: "UNKNOWN"
+      packages: []
+      status: "error"
+      error_message: "Host unreachable during fact gathering"
+    current_host_error:
+      hostname: "{{ target_host }}"
+      error_type: "unreachable"
+      error_message: "Host unreachable during fact gathering"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+  when: not (host_reachable | bool)
+  tags: [processing, unreachable_error]
+
+- name: "(process_host_data) Add host data to aggregated list"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'hosts': aggregated_data.hosts + [current_host_data]
+    }) }}"
+  when: current_host_data != {}
+  tags: [processing, aggregation]
+
+- name: "(process_host_data) Add error to aggregated errors list"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'errors': aggregated_data.errors + [current_host_error]
+    }) }}"
+  when: current_host_error is not none
+  tags: [processing, error_aggregation]
+
+- name: "(process_host_data) Debug host processing result for {{ target_host }}"
+  debug:
+    msg: |
+      Host {{ target_host }} processing:
+      - Reachable: {{ host_reachable | default(false) }}
+      - Has updates: {{ host_has_updates | default(false) }}
+      - Status: {{ current_host_data.status | default('unknown') }}
+      - Updates: {{ current_host_data.total_updates | default(0) }}
+      - Security: {{ current_host_data.security_updates | default(0) }}
+  tags: [processing, debug]

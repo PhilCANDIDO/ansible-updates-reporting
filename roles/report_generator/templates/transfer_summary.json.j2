@@ -1,0 +1,47 @@
+{
+  "transfer_metadata": {
+    "execution_id": "{{ execution_id }}",
+    "transfer_timestamp": "{{ ansible_date_time.iso8601 }}",
+    "source_control_node": "{{ ansible_hostname }}",
+    "destination_repository": "{{ groups['repository_managers'][0] }}",
+    "repository_path": "{{ repository_base_path }}"
+  },
+  "transfer_summary": {
+    "formats_transferred": {{ report_formats | to_json }},
+    "total_hosts_processed": {{ aggregated_data.summary.total_hosts | int }},
+    "hosts_with_data": {{ aggregated_data.hosts | length | int }},
+    "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
+    "total_updates": {{ aggregated_data.summary.total_updates | int }},
+    "security_updates": {{ aggregated_data.summary.total_security_updates | int }},
+    "critical_hosts": {{ aggregated_data.critical_hosts | length | int }}
+  },
+  "file_manifest": {
+    {% if 'json' in report_formats %}
+    "json_files": [
+      "consolidated_report_{{ execution_id }}.json",
+      "index.json"{% for host in aggregated_data.hosts %},
+      "{{ host.hostname }}_{{ execution_id }}.json"{% endfor %}{% if aggregated_data.errors | length > 0 %},
+      "errors_{{ execution_id }}.json"{% endif %}
+    ],
+    {% endif %}
+    {% if 'html' in report_formats %}
+    "html_files": [
+      "consolidated_report_{{ execution_id }}.html",
+      "email_summary_{{ execution_id }}.html",
+      "index.html"{% for host in aggregated_data.hosts %},
+      "{{ host.hostname }}_{{ execution_id }}.html"{% endfor %}{% if aggregated_data.errors | length > 0 %},
+      "errors_{{ execution_id }}.html"{% endif %}
+    ],
+    {% endif %}
+    {% if 'excel' in report_formats %}
+    "excel_files": [
+      "consolidated_report_{{ execution_id }}.xlsx"
+    ]
+    {% endif %}
+  },
+  "quality_metrics": {
+    "data_completeness_percentage": {{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
+    "error_rate_percentage": {{ ((aggregated_data.summary.hosts_with_errors | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
+    "security_coverage": "{{ 'HIGH' if aggregated_data.summary.total_security_updates > 0 else 'LOW' }}"
+  }
+}

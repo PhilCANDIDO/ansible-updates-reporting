@@ -1,0 +1,95 @@
+---
+- name: "(aggregate_data) Collect facts from all hosts"
+  setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - "network"
+      - "hardware"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) }}"
+  ignore_errors: true
+  tags: [aggregation, facts]
+
+- name: "(aggregate_data) Aggregate host data with error handling"
+  set_fact:
+    aggregated_data:
+      summary:
+        total_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | length }}"
+        total_updates: 0
+        total_security_updates: 0
+        hosts_requiring_reboot: 0
+        hosts_with_errors: 0
+        generation_timestamp: "{{ ansible_date_time.iso8601 }}"
+        execution_id: "{{ execution_id }}"
+        storage_type: "control_node"
+        report_location: "{{ control_node_reports_path }}"
+      hosts: []
+      errors: []
+      by_os_family: {}
+      critical_hosts: []
+  run_once: true
+  tags: [aggregation, initialization]
+
+- name: "(aggregate_data) Process each host data"
+  include_tasks: process_host_data.yml
+  loop: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) }}"
+  loop_control:
+    loop_var: target_host
+  run_once: true
+  tags: [aggregation, processing]
+
+- name: "(aggregate_data) Calculate final summary statistics"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'summary': aggregated_data.summary | combine({
+        'total_updates': aggregated_data.hosts | map(attribute='total_updates') | map('int') | sum,
+        'total_security_updates': aggregated_data.hosts | map(attribute='security_updates') | map('int') | sum,
+        'hosts_requiring_reboot': aggregated_data.hosts | selectattr('requires_reboot', 'equalto', true) | list | length,
+        'hosts_with_errors': aggregated_data.errors | length
+      })
+    }) }}"
+  run_once: true
+  tags: [aggregation, summary]
+
+- name: "(aggregate_data) Group hosts by OS family"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'by_os_family': aggregated_data.hosts | groupby('distribution') | 
+      items2dict(key_name=0, value_name=1)
+    }) }}"
+  run_once: true
+  tags: [aggregation, grouping]
+
+- name: "(aggregate_data) Identify critical hosts"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'critical_hosts': aggregated_data.hosts | 
+      selectattr('security_updates', '>', (security_thresholds.critical_updates | int)) | list
+    }) }}"
+  run_once: true
+  tags: [aggregation, critical]
+
+- name: "(aggregate_data) Save aggregated data to control node"
+  copy:
+    content: "{{ aggregated_data | to_nice_json }}"
+    dest: "{{ control_node_reports_path }}/aggregated_data.json"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [aggregation, save]
+
+- name: "(aggregate_data) Display aggregation summary"
+  debug:
+    msg: |
+      Data Aggregation Summary:
+      - Total hosts: {{ aggregated_data.summary.total_hosts }}
+      - Hosts processed successfully: {{ aggregated_data.hosts | length }}
+      - Hosts with errors: {{ aggregated_data.summary.hosts_with_errors }}
+      - Total updates: {{ aggregated_data.summary.total_updates }}
+      - Security updates: {{ aggregated_data.summary.total_security_updates }}
+      - Critical hosts: {{ aggregated_data.critical_hosts | length }}
+      - Data saved to: {{ control_node_reports_path }}/aggregated_data.json
+  run_once: true
+  tags: [aggregation, info]

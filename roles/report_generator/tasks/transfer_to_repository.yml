@@ -1,0 +1,108 @@
+---
+- name: "(transfer_to_repository) Verify repository manager connectivity"
+  ping:
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  run_once: true
+  tags: [transfer, connectivity]
+
+- name: "(transfer_to_repository) Ensure repository current directories exist"
+  file:
+    path: "{{ repository_base_path }}/{{ item }}/current"
+    state: directory
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0755'
+  loop: "{{ report_formats }}"
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, directories]
+
+- name: "(transfer_to_repository) Transfer JSON reports to repository"
+  copy:
+    src: "{{ control_node_reports_path }}/json/"
+    dest: "{{ repository_base_path }}/json/current/"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+    backup: true
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  when: "'json' in report_formats"
+  tags: [transfer, json]
+
+- name: "(transfer_to_repository) Transfer HTML reports to repository"
+  copy:
+    src: "{{ control_node_reports_path }}/html/"
+    dest: "{{ repository_base_path }}/html/current/"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+    backup: true
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  when: "'html' in report_formats"
+  tags: [transfer, html]
+
+- name: "(transfer_to_repository) Transfer Excel reports to repository"
+  copy:
+    src: "{{ control_node_reports_path }}/excel/"
+    dest: "{{ repository_base_path }}/excel/current/"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+    backup: true
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  when: "'excel' in report_formats"
+  tags: [transfer, excel]
+
+- name: "(transfer_to_repository) Create transfer summary file"
+  template:
+    src: transfer_summary.json.j2
+    dest: "{{ repository_base_path }}/logs/transfer_{{ execution_id }}.json"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, summary]
+
+- name: "(transfer_to_repository) Update repository index with latest execution"
+  lineinfile:
+    path: "{{ repository_base_path }}/logs/executions.log"
+    line: "{{ ansible_date_time.iso8601 }} - {{ execution_id }} - {{ aggregated_data.summary.total_hosts }} hosts - {{ aggregated_data.summary.total_updates }} updates - {{ aggregated_data.summary.total_security_updates }} security"
+    create: true
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, logging]
+
+- name: "(transfer_to_repository) Cleanup control node temporary files"
+  file:
+    path: "{{ control_node_reports_path }}"
+    state: absent
+  delegate_to: localhost
+  run_once: true
+  when: cleanup_control_node_files | default(true) | bool
+  tags: [transfer, cleanup]
+
+- name: "(transfer_to_repository) Display transfer summary"
+  debug:
+    msg: |
+      Repository Transfer Summary:
+      - Repository server: {{ groups['repository_managers'][0] }}
+      - Base path: {{ repository_base_path }}
+      - Formats transferred: {{ report_formats | join(', ') }}
+      - Execution ID: {{ execution_id }}
+      - Transfer timestamp: {{ ansible_date_time.iso8601 }}
+      - Control node cleanup: {{ cleanup_control_node_files | default(true) }}
+  run_once: true
+  tags: [transfer, info]

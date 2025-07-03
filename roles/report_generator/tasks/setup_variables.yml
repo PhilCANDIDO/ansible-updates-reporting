@@ -1,0 +1,57 @@
+---
+- name: "(setup_variables) Set default execution_id if not defined"
+  set_fact:
+    execution_id: "{{ execution_id | default(ansible_date_time.iso8601_basic_short) }}"
+  when: execution_id is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set control node reports path"
+  set_fact:
+    control_node_reports_path: "{{ control_node_temp_path | default('/tmp') }}/ansible-reports-{{ execution_id }}"
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set default report formats if not defined"
+  set_fact:
+    report_formats: "{{ report_formats | default(['json', 'html', 'excel']) }}"
+  when: report_formats is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Set default security thresholds if not defined"
+  set_fact:
+    security_thresholds:
+      critical_updates: "{{ security_thresholds.critical_updates | default(5) | int }}"
+      security_updates: "{{ security_thresholds.security_updates | default(10) | int }}"
+      total_updates: "{{ security_thresholds.total_updates | default(50) | int }}"
+  when: security_thresholds is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Create control node reports directory"
+  file:
+    path: "{{ control_node_reports_path }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  tags: [setup, directories]
+
+- name: "(setup_variables) Create format subdirectories on control node"
+  file:
+    path: "{{ control_node_reports_path }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ report_formats }}"
+  delegate_to: localhost
+  run_once: true
+  tags: [setup, directories]
+
+- name: "(setup_variables) Display variables status"
+  debug:
+    msg: |
+      Report Generator Variables:
+      - execution_id: {{ execution_id }}
+      - control_node_reports_path: {{ control_node_reports_path }}
+      - report_formats: {{ report_formats | join(', ') }}
+      - use_repository_manager: {{ use_repository_manager | default(false) }}
+      - repository_base_path: {{ repository_base_path | default('N/A') }}
+  run_once: true
+  tags: [setup, variables, debug]

@@ -1,0 +1,76 @@
+---
+- name: "(generate_excel) Check if Python openpyxl is available"
+  pip:
+    name: openpyxl
+    state: present
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, dependencies]
+
+- name: "(generate_excel) Generate Excel workbook data"
+  template:
+    src: excel_data.json.j2
+    dest: "{{ control_node_reports_path }}/excel/excel_data_{{ execution_id }}.json"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, data]
+
+- name: "(generate_excel) Create Excel generation script"
+  template:
+    src: generate_excel.py.j2
+    dest: "{{ control_node_reports_path }}/excel/generate_excel.py"
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, script]
+
+- name: "(generate_excel) Execute Excel generation script"
+  command: >
+    python3 {{ control_node_reports_path }}/excel/generate_excel.py
+    {{ control_node_reports_path }}/excel/excel_data_{{ execution_id }}.json
+    {{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.xlsx
+  delegate_to: localhost
+  run_once: true
+  register: excel_generation_result
+  tags: [generation, excel, execute]
+
+- name: "(generate_excel) Handle Excel generation errors"
+  debug:
+    msg: |
+      Excel generation failed: {{ excel_generation_result.stderr | default('Unknown error') }}
+      Fallback: Creating CSV file instead
+  when: excel_generation_result.rc != 0
+  tags: [generation, excel, error]
+
+- name: "(generate_excel) Generate CSV fallback if Excel fails"
+  template:
+    src: consolidated_report.csv.j2
+    dest: "{{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.csv"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  when: excel_generation_result.rc != 0
+  tags: [generation, excel, fallback]
+
+- name: "(generate_excel) Cleanup temporary files"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ control_node_reports_path }}/excel/excel_data_{{ execution_id }}.json"
+    - "{{ control_node_reports_path }}/excel/generate_excel.py"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, cleanup]
+
+- name: "(generate_excel) Display Excel generation summary"
+  debug:
+    msg: |
+      Excel Report Generation:
+      - Status: {{ 'Success' if excel_generation_result.rc == 0 else 'Failed - CSV fallback created' }}
+      - File: {{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.{{ 'xlsx' if excel_generation_result.rc == 0 else 'csv' }}
+      - Hosts included: {{ aggregated_data.hosts | length }}
+      - Errors included: {{ aggregated_data.errors | length }}
+  run_once: true
+  tags: [generation, excel, summary]

@@ -1,0 +1,49 @@
+---
+- name: "(generate_json) Generate consolidated JSON report"
+  template:
+    src: consolidated_report.json.j2
+    dest: "{{ control_node_reports_path }}/json/consolidated_report_{{ execution_id }}.json"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, json, consolidated]
+
+- name: "(generate_json) Generate individual host JSON reports"
+  template:
+    src: individual_host_report.json.j2
+    dest: "{{ control_node_reports_path }}/json/{{ item.hostname }}_{{ execution_id }}.json"
+    mode: '0644'
+  loop: "{{ aggregated_data.hosts }}"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, json, individual]
+
+- name: "(generate_json) Generate errors JSON report"
+  template:
+    src: errors_report.json.j2
+    dest: "{{ control_node_reports_path }}/json/errors_{{ execution_id }}.json"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  when: aggregated_data.errors | length > 0
+  tags: [generation, json, errors]
+
+- name: "(generate_json) Generate JSON index file"
+  template:
+    src: json_index.json.j2
+    dest: "{{ control_node_reports_path }}/json/index.json"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, json, index]
+
+- name: "(generate_json) Display JSON generation summary"
+  debug:
+    msg: |
+      JSON Reports Generated:
+      - Consolidated report: {{ control_node_reports_path }}/json/consolidated_report_{{ execution_id }}.json
+      - Individual reports: {{ aggregated_data.hosts | length }} files
+      - Error reports: {{ 'Yes' if aggregated_data.errors | length > 0 else 'No' }}
+      - Index file: {{ control_node_reports_path }}/json/index.json
+  run_once: true
+  tags: [generation, json, summary]

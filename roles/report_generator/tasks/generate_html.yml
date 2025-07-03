@@ -1,0 +1,59 @@
+---
+- name: "(generate_html) Generate consolidated HTML report"
+  template:
+    src: consolidated_report.html.j2
+    dest: "{{ control_node_reports_path }}/html/consolidated_report_{{ execution_id }}.html"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, html, consolidated]
+
+- name: "(generate_html) Generate HTML summary report (Outlook compatible)"
+  template:
+    src: email_summary_report.html.j2
+    dest: "{{ control_node_reports_path }}/html/email_summary_{{ execution_id }}.html"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, html, email]
+
+- name: "(generate_html) Generate individual host HTML reports"
+  template:
+    src: individual_host_report.html.j2
+    dest: "{{ control_node_reports_path }}/html/{{ item.hostname }}_{{ execution_id }}.html"
+    mode: '0644'
+  loop: "{{ aggregated_data.hosts }}"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, html, individual]
+
+- name: "(generate_html) Generate errors HTML report"
+  template:
+    src: errors_report.html.j2
+    dest: "{{ control_node_reports_path }}/html/errors_{{ execution_id }}.html"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  when: aggregated_data.errors | length > 0
+  tags: [generation, html, errors]
+
+- name: "(generate_html) Generate HTML index page"
+  template:
+    src: html_index.html.j2
+    dest: "{{ control_node_reports_path }}/html/index.html"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, html, index]
+
+- name: "(generate_html) Display HTML generation summary"
+  debug:
+    msg: |
+      HTML Reports Generated:
+      - Consolidated report: {{ control_node_reports_path }}/html/consolidated_report_{{ execution_id }}.html
+      - Email summary: {{ control_node_reports_path }}/html/email_summary_{{ execution_id }}.html
+      - Individual reports: {{ aggregated_data.hosts | length }} files
+      - Error reports: {{ 'Yes' if aggregated_data.errors | length > 0 else 'No' }}
+      - Index page: {{ control_node_reports_path }}/html/index.html
+  run_once: true
+  tags: [generation, html, summary]

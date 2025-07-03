@@ -3,19 +3,27 @@
     "report_version": "1.0",
     "report_type": "consolidated",
     "execution_id": "{{ execution_id }}",
-    "generation_timestamp": "{{ consolidated_data.summary.generation_timestamp }}",
-    "storage_type": "{{ consolidated_data.summary.storage_type }}",
-    "report_location": "{{ consolidated_data.summary.report_location }}"
+    "generation_timestamp": "{{ aggregated_data.summary.generation_timestamp }}",
+    "storage_type": "{{ aggregated_data.summary.storage_type }}",
+    "report_location": "{{ aggregated_data.summary.report_location }}"
   },
   "summary": {
-    "total_hosts": {{ consolidated_data.summary.total_hosts | int }},
-    "total_updates": {{ consolidated_data.summary.total_updates | int }},
-    "total_security_updates": {{ consolidated_data.summary.total_security_updates | int }},
-    "hosts_requiring_reboot": {{ consolidated_data.summary.hosts_requiring_reboot | int }},
-    "critical_hosts": {{ consolidated_data.critical_hosts | length | int }},
-    "overall_priority": "{% set sec_count = consolidated_data.summary.total_security_updates | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}"
+    "total_hosts": {{ aggregated_data.summary.total_hosts | int }},
+    "hosts_processed": {{ aggregated_data.hosts | length | int }},
+    "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
+    "total_updates": {{ aggregated_data.summary.total_updates | int }},
+    "total_security_updates": {{ aggregated_data.summary.total_security_updates | int }},
+    "hosts_requiring_reboot": {{ aggregated_data.summary.hosts_requiring_reboot | int }},
+    "critical_hosts": {{ aggregated_data.critical_hosts | length | int }},
+    "overall_priority": "{% set sec_count = aggregated_data.summary.total_security_updates | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}"
   },
-  "hosts": {{ consolidated_data.hosts | to_nice_json }},
-  "os_distribution": {{ consolidated_data.by_os_family | to_nice_json }},
-  "critical_hosts": {{ consolidated_data.critical_hosts | to_nice_json }}
+  "hosts": {{ aggregated_data.hosts | to_nice_json }},
+  "errors": {{ aggregated_data.errors | to_nice_json }},
+  "os_distribution": {{ aggregated_data.by_os_family | to_nice_json }},
+  "critical_hosts": {{ aggregated_data.critical_hosts | to_nice_json }},
+  "thresholds": {
+    "critical_updates": {{ security_thresholds.critical_updates | default(5) | int }},
+    "security_updates": {{ security_thresholds.security_updates | default(10) | int }},
+    "total_updates": {{ security_thresholds.total_updates | default(50) | int }}
+  }
 }

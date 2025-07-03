@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "report_version": "1.0",
+    "report_type": "individual_host",
+    "execution_id": "{{ execution_id }}",
+    "generation_timestamp": "{{ ansible_date_time.iso8601 }}",
+    "hostname": "{{ item.hostname }}",
+    "fqdn": "{{ item.fqdn }}",
+    "ip_address": "{{ item.ip_address }}"
+  },
+  "system_info": {
+    "hostname": "{{ item.hostname }}",
+    "fqdn": "{{ item.fqdn }}",
+    "ip_address": "{{ item.ip_address }}",
+    "distribution": "{{ item.distribution }}",
+    "version": "{{ item.version }}",
+    "architecture": "{{ item.architecture }}",
+    "kernel": "{{ item.kernel }}",
+    "uptime_seconds": {{ item.uptime_seconds | int }}
+  },
+  "updates_summary": {
+    "total_updates": {{ item.total_updates | int }},
+    "security_updates": {{ item.security_updates | int }},
+    "critical_level": "{{ item.critical_level }}",
+    "collection_method": "{{ item.collection_method }}",
+    "collection_timestamp": "{{ item.collection_timestamp }}",
+    "requires_reboot": {{ item.requires_reboot | lower }},
+    "status": "{{ item.status }}"{% if item.error_message is defined %},
+    "error_message": "{{ item.error_message | regex_replace('[^\\x20-\\x7E]', '?') }}"{% endif %}
+  },
+  "packages": {{ item.packages | to_nice_json }}
+}

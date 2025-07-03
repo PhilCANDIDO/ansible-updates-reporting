@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "report_version": "1.0",
+    "report_type": "errors",
+    "execution_id": "{{ execution_id }}",
+    "generation_timestamp": "{{ ansible_date_time.iso8601 }}",
+    "total_errors": {{ aggregated_data.errors | length | int }}
+  },
+  "summary": {
+    "total_hosts": {{ aggregated_data.summary.total_hosts | int }},
+    "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
+    "error_percentage": {{ ((aggregated_data.summary.hosts_with_errors | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
+    "error_types": {
+      "unreachable": {{ aggregated_data.errors | selectattr('error_type', 'equalto', 'unreachable') | list | length }},
+      "collection_failed": {{ aggregated_data.errors | selectattr('error_type', 'equalto', 'collection_failed') | list | length }}
+    }
+  },
+  "errors": [
+    {% for error in aggregated_data.errors %}
+    {
+      "hostname": "{{ error.hostname }}",
+      "error_type": "{{ error.error_type }}",
+      "error_message": "{{ error.error_message | regex_replace('[^\\x20-\\x7E]', '?') }}",
+      "timestamp": "{{ error.timestamp }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "recommendations": [
+    {% if aggregated_data.errors | selectattr('error_type', 'equalto', 'unreachable') | list | length > 0 %}
+    "Check network connectivity and SSH access for unreachable hosts",
+    {% endif %}
+    {% if aggregated_data.errors | selectattr('error_type', 'equalto', 'collection_failed') | list | length > 0 %}
+    "Verify package manager functionality on hosts with collection failures",
+    {% endif %}
+    "Review firewall rules and authentication methods",
+    "Consider increasing SSH timeout values for slow networks"
+  ]
+}

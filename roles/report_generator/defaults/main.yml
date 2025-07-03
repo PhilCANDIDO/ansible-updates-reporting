@@ -1,3 +1,36 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for roles/report_generator
+
+# Execution configuration
+execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
+
+# Control node temporary storage
+control_node_temp_path: "/tmp"
+cleanup_control_node_files: true
+
+# Repository manager configuration
+use_repository_manager: false
+repository_base_path: "/var/www/reports"
+
+# Report formats to generate
+report_formats:
+  - json
+  - html
+  - excel
+
+# Security thresholds for priority classification
+security_thresholds:
+  critical_updates: 5
+  security_updates: 10
+  total_updates: 50
+
+# Excel generation settings
+excel_generation_timeout: 300
+excel_fallback_to_csv: true
+
+# Transfer settings
+transfer_backup: true
+transfer_owner: "www-data"
+transfer_group: "www-data"
+transfer_mode: "0644"
