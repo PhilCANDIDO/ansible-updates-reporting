@@ -1,16 +1,14 @@
 {
-  "api_info": {
+  "format_info": {
     "format": "{{ format_type }}",
-    "description": "{{ format_type | title }} reports API catalog",
-    "server": "{{ ansible_fqdn | default(ansible_hostname) }}",
-    "last_updated": "{{ ansible_date_time.iso8601 }}",
-    "content_type": "{% if format_type == 'json' %}application/json{% elif format_type == 'html' %}text/html{% elif format_type == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}"
+    "description": "{{ format_type | title }} format reports for system updates",
+    "content_type": "{% if format_type == 'json' %}application/json{% elif format_type == 'html' %}text/html{% elif format_type == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}",
+    "last_updated": "{{ ansible_date_time.iso8601 }}"
   },
   "endpoints": {
-    "format_base": "/{{ format_type }}/",
-    "api_catalog": "/{{ format_type }}/api.json",
-    "latest_reports": "/{{ format_type }}/latest/",
-    "browse_all": "/{{ format_type }}/"
+    "format_root": "/{{ format_type }}/",
+    "latest": "/{{ format_type }}/latest/",
+    "api_catalog": "/{{ format_type }}/api.json"
   },
   "available_timestamps": [
     {% for timestamp in format_directories %}
@@ -21,29 +19,29 @@
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ],
-  "latest": {
-    {% if format_directories | length > 0 %}
-    "timestamp": "{{ format_directories[0] }}",
-    "url": "/{{ format_type }}/latest/",
-    "direct_url": "/{{ format_type }}/{{ format_directories[0] }}/"
-    {% else %}
-    "timestamp": null,
-    "url": "/{{ format_type }}/latest/",
-    "direct_url": null
+  "total_archives": {{ format_directories | length }},
+  "latest_timestamp": "{{ format_directories | first | default('N/A') }}",
+  "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
+  "quick_links": {
+    "latest_reports": "/{{ format_type }}/latest/",
+    {% if format_type == 'html' %}
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.html",
+    "latest_summary": "/{{ format_type }}/latest/email_summary.html"
+    {% elif format_type == 'json' %}
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.json",
+    "latest_index": "/{{ format_type }}/latest/index.json"
+    {% elif format_type == 'excel' %}
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report.xlsx"
     {% endif %}
   },
-  "statistics": {
-    "total_archives": {{ format_directories | length }},
-    "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
-    "newest_timestamp": "{{ format_directories | first | default('N/A') }}"
-  },
-  "usage_examples": {
-    "list_all_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json",
-    "access_latest": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/",
-    {% if format_directories | length > 0 %}
-    "access_specific": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/{{ format_directories[0] }}/"
-    {% else %}
-    "access_specific": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/YYYYMMDDHHMMSS/"
-    {% endif %}
+  "navigation": {
+    "parent_api": "/api.json",
+    "sibling_formats": {
+      {% for fmt in report_formats %}
+      {% if fmt != format_type %}
+      "{{ fmt }}": "/{{ fmt }}/api.json"{% if not loop.last %},{% endif %}
+      {% endif %}
+      {% endfor %}
+    }
   }
 }

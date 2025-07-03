@@ -84,6 +84,7 @@
         name: report_generator
       tags: [reporting, generation]
 
+# site.yml - Section à corriger
 - name: "Update Repository APIs and Indexes"
   hosts: repository_managers
   gather_facts: false
@@ -93,14 +94,11 @@
     execution_id: "{{ hostvars['localhost']['execution_id'] }}"
     execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
-    transfer_timestamp: "{{ hostvars[groups['repository_managers'][0]]['transfer_timestamp'] | default(ansible_date_time.iso8601_basic_short) }}"
   tasks:
-    - name: "(repository_update) Include repository update tasks"
-      include_role:
-        name: repository_manager
-        tasks_from: update_indexes
+    - name: "(repository_update) Regenerate API endpoints after report transfer"
+      include_tasks: roles/repository_manager/tasks/generate_api_endpoints.yml
       when: use_repository_manager | bool
-      tags: [repository, update]
+      tags: [repository, api_update]
 
 - name: "Send Notifications"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"

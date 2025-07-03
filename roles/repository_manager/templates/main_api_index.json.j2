@@ -1,0 +1,68 @@
+{
+  "api_info": {
+    "name": "Ansible Updates Reporting API",
+    "version": "1.0",
+    "description": "REST API for accessing system updates reports",
+    "server": "{{ ansible_fqdn | default(ansible_hostname) }}",
+    "last_updated": "{{ ansible_date_time.iso8601 }}",
+    "documentation": "https://github.com/PhilCANDIDO/ansible-updates-reporting"
+  },
+  "endpoints": {
+    "root": {
+      "url": "/",
+      "description": "Main repository landing page"
+    },
+    "api_info": {
+      "url": "/api.json",
+      "description": "This API information endpoint"
+    }
+  },
+  "formats": {
+    {% for format in report_formats %}
+    "{{ format }}": {
+      "base_url": "/{{ format }}/",
+      "api_catalog": "/{{ format }}/api.json",
+      "latest": "/{{ format }}/latest/",
+      "description": "{{ format | title }} format reports",
+      "content_type": "{% if format == 'json' %}application/json{% elif format == 'html' %}text/html{% elif format == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  },
+  "global_statistics": {
+    "total_formats": {{ report_formats | length }},
+    "total_archived_reports": {{ all_directories | default([]) | length }},
+    "available_timestamps": {{ all_directories | default([]) | to_json }},
+    "latest_timestamp": "{{ all_directories | default([]) | first | default('N/A') }}",
+    "oldest_timestamp": "{{ all_directories | default([]) | last | default('N/A') }}",
+    "retention_policy": {
+      "max_archives": {{ max_archived_reports | default(50) }},
+      "retention_days": {{ repository_retention_days | default(30) }}
+    }
+  },
+  "quick_access": {
+    "latest_reports": {
+      {% for format in report_formats %}
+      "{{ format }}": "/{{ format }}/latest/"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    },
+    "format_apis": {
+      {% for format in report_formats %}
+      "{{ format }}": "/{{ format }}/api.json"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }
+  },
+  "usage_examples": {
+    "get_all_formats": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/api.json",
+    "get_latest_html": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/latest/",
+    "get_latest_json": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/latest/",
+    "list_json_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/api.json",
+    "get_specific_timestamp": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/{{ all_directories | default([]) | first | default('20250703160449') }}/"
+  },
+  "integration_notes": {
+    "cors": "CORS headers are enabled for API endpoints",
+    "authentication": "No authentication required for read-only access",
+    "rate_limiting": "No rate limiting currently implemented",
+    "caching": "Static files are cached by the web server",
+    "timestamps": "All timestamps use format YYYYMMDDhhmmss in UTC"
+  }
+}
