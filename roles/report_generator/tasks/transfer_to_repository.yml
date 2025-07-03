@@ -12,6 +12,18 @@
   run_once: true
   tags: [transfer, timestamp]
 
+- name: "(transfer_to_repository) Ensure logs directory exists"
+  file:
+    path: "{{ repository_base_path }}/logs"
+    state: directory
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0755'
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, directories, logs]
+
 - name: "(transfer_to_repository) Create timestamped directories for each format"
   file:
     path: "{{ repository_base_path }}/{{ item }}/{{ transfer_timestamp }}"
