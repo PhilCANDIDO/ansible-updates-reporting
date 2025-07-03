@@ -13,19 +13,25 @@
   failed_when: false
   tags: [debian, package_list]
 
-- name: "(collect_debian_updates) Get security updates"
-  shell: |
-    apt list --upgradable 2>/dev/null | grep -E '(security|security-updates)' | wc -l
-  register: debian_security_count
-  changed_when: false
-  failed_when: false
-  tags: [debian, security_updates]
-
 - name: "(collect_debian_updates) Parse upgradable packages"
   set_fact:
     debian_updates: "{{ debian_upgradable_raw.stdout_lines | default([]) | debian_parse_updates }}"
-    debian_security_updates_count: "{{ debian_security_count.stdout | int }}"
   tags: [debian, parsing]
+
+- name: "(collect_debian_updates) Count security updates from parsed packages"
+  set_fact:
+    debian_security_updates_count: "{{ debian_updates | selectattr('is_security', 'equalto', true) | list | length }}"
+  tags: [debian, security_count]
+
+- name: "(collect_debian_updates) Debug security information"
+  debug:
+    msg: |
+      Security Updates Information:
+      - Total packages: {{ debian_updates | length }}
+      - Security packages found: {{ debian_security_updates_count }}
+      - Security packages list: {{ debian_updates | selectattr('is_security', 'equalto', true) | map(attribute='name') | list }}
+  when: debian_security_updates_count | int > 0
+  tags: [debian, debug]
 
 - name: "(collect_debian_updates) Set collected updates for this host"
   set_fact:
