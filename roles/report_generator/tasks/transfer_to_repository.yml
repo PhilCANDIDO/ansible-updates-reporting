@@ -7,7 +7,7 @@
 
 - name: "(transfer_to_repository) Generate transfer timestamp"
   set_fact:
-    transfer_timestamp: "{{ ansible_date_time.strftime('%Y%m%d%H%M%S') }}"
+    transfer_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
   delegate_to: "{{ groups['repository_managers'][0] }}"
   run_once: true
   tags: [transfer, timestamp]

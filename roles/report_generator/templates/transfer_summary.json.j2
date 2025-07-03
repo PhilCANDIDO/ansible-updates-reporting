@@ -1,13 +1,13 @@
 {
   "transfer_metadata": {
     "execution_id": "{{ execution_id }}",
-    "transfer_timestamp": "{{ transfer_timestamp_var }}",
+    "transfer_timestamp": "{{ transfer_timestamp }}",
     "generation_timestamp": "{{ ansible_date_time.iso8601 }}",
     "source_control_node": "{{ ansible_hostname }}",
     "destination_repository": "{{ groups['repository_managers'][0] }}",
     "repository_path": "{{ repository_base_path }}",
     "timestamped_storage": true,
-    "storage_structure": "{{ repository_base_path }}/{format}/{{ transfer_timestamp_var }}/"
+    "storage_structure": "{{ repository_base_path }}/{format}/{{ transfer_timestamp }}/"
   },
   "transfer_summary": {
     "formats_transferred": {{ report_formats | to_json }},
@@ -19,7 +19,7 @@
     "critical_hosts": {{ aggregated_data.critical_hosts | length | int }},
     "timestamped_directories_created": [
       {% for format in report_formats %}
-      "{{ repository_base_path }}/{{ format }}/{{ transfer_timestamp_var }}"{% if not loop.last %},{% endif %}
+      "{{ repository_base_path }}/{{ format }}/{{ transfer_timestamp }}"{% if not loop.last %},{% endif %}
       {% endfor %}
     ],
     "latest_symlinks_updated": true
@@ -52,7 +52,7 @@
     "base_url": "http://{{ groups['repository_managers'][0] }}",
     "timestamped_urls": {
       {% for format in report_formats %}
-      "{{ format }}": "http://{{ groups['repository_managers'][0] }}/{{ format }}/{{ transfer_timestamp_var }}/"{% if not loop.last %},{% endif %}
+      "{{ format }}": "http://{{ groups['repository_managers'][0] }}/{{ format }}/{{ transfer_timestamp }}/"{% if not loop.last %},{% endif %}
       {% endfor %}
     },
     "latest_urls": {
