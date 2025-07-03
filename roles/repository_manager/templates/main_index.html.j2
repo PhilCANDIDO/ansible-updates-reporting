@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ansible Updates Reports Repository</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .server-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        .format-card {
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            padding: 25px;
+            background: #fafbfc;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .format-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        .format-icon {
+            font-size: 3em;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .format-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .format-description {
+            color: #666;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .format-links {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .format-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        .format-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .api-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+        }
+        .api-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .api-endpoints {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .api-endpoint {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .api-endpoint code {
+            background: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .footer {
+            background: #34495e;
+            color: white;
+            text-align: center;
+            padding: 25px;
+            font-size: 0.9em;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #27ae60;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Ansible Updates Reports Repository</h1>
+            <p>Central repository for system updates reporting across your infrastructure</p>
+            <div class="server-info">
+                <strong>Server:</strong> {{ ansible_fqdn | default(ansible_hostname) }} | 
+                <strong>OS:</strong> {{ os_detection.distribution | default(ansible_distribution) }} {{ os_detection.version | default(ansible_distribution_version) }} | 
+                <strong>Web Server:</strong> {{ webserver_type | title }}
+            </div>
+        </div>
+
+        <div class="content">
+            <h2 style="color: #2c3e50; text-align: center; margin-bottom: 30px;">📊 Available Report Formats</h2>
+            
+            <div class="format-grid">
+                {% for format in report_formats %}
+                <div class="format-card" onclick="window.location.href='{{ format }}/'">
+                    <div class="format-icon">
+                        {% if format == 'json' %}📄{% elif format == 'html' %}🌐{% elif format == 'excel' %}📊{% endif %}
+                    </div>
+                    <div class="format-title">{{ format | title }} Reports</div>
+                    <div class="format-description">
+                        {% if format == 'json' %}
+                        Machine-readable format for API integration and automated processing
+                        {% elif format == 'html' %}
+                        Human-readable format optimized for web browsers and email clients
+                        {% elif format == 'excel' %}
+                        Spreadsheet format for analysis and reporting in office applications
+                        {% endif %}
+                    </div>
+                    <div class="format-links">
+                        <a href="{{ format }}/" class="format-link">Browse</a>
+                        <a href="{{ format }}/latest/" class="format-link">Latest</a>
+                        <a href="{{ format }}/api.json" class="format-link">API</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="api-section">
+                <h3>🔌 API Integration</h3>
+                <p>Access reports programmatically using our REST API endpoints:</p>
+                
+                <div class="api-endpoints">
+                    <div class="api-endpoint">
+                        <strong>Main API Catalog</strong><br>
+                        <code>GET /api.json</code><br>
+                        <small>Complete API documentation and endpoints</small>
+                    </div>
+                    
+                    {% for format in report_formats %}
+                    <div class="api-endpoint">
+                        <strong>{{ format | title }} API</strong><br>
+                        <code>GET /{{ format }}/api.json</code><br>
+                        <small>{{ format | title }} specific endpoints and timestamps</small>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="api-endpoint">
+                        <strong>Latest Reports</strong><br>
+                        <code>GET /{format}/latest/</code><br>
+                        <small>Always points to the most recent reports</small>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; border-left: 4px solid #27ae60;">
+                <h3 style="color: #2c3e50; margin-top: 0;">💡 Quick Start</h3>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>View Latest Reports:</strong> Click on any format card above</li>
+                    <li><strong>API Access:</strong> <code>curl http://{{ ansible_fqdn | default(ansible_hostname) }}/api.json</code></li>
+                    <li><strong>Browse Archives:</strong> Each format maintains timestamped archives</li>
+                    <li><strong>Integration:</strong> Use JSON API for automated processing</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Ansible Updates Reporting System</strong></p>
+            <p>Repository Path: {{ repository_base_path }} | Last Updated: {{ ansible_date_time.iso8601 }}</p>
+            <p>Retention Policy: {{ repository_retention_days }} days | Max Archives: {{ max_archived_reports | default(50) }}</p>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactive feedback
+        document.querySelectorAll('.format-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px) scale(1.02)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>

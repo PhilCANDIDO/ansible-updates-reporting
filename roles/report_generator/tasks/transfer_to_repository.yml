@@ -94,44 +94,6 @@
   run_once: true
   tags: [transfer, symlinks]
 
-- name: "(transfer_to_repository) Check if format index files exist"
-  stat:
-    path: "{{ repository_base_path }}/{{ item }}/index.html"
-  register: format_index_check
-  loop: "{{ report_formats }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, index_check]
-
-- name: "(transfer_to_repository) Create format index files if they don't exist"
-  template:
-    src: format_index.html.j2
-    dest: "{{ repository_base_path }}/{{ item.item }}/index.html"
-    owner: "{{ current_webserver_user | default('www-data') }}"
-    group: "{{ current_webserver_group | default('www-data') }}"
-    mode: '0644'
-  loop: "{{ format_index_check.results }}"
-  when: not item.stat.exists
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  vars:
-    format_type: "{{ item.item }}"
-  tags: [transfer, index_create]
-
-- name: "(transfer_to_repository) Update format index files with new timestamp"
-  lineinfile:
-    path: "{{ repository_base_path }}/{{ item }}/index.html"
-    regexp: "<!-- TIMESTAMP_MARKER -->"
-    line: "                <!-- TIMESTAMP_MARKER -->"
-    insertbefore: "<!-- TIMESTAMP_MARKER -->"
-    create: false
-  loop: "{{ report_formats }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, index_update]
-
 - name: "(transfer_to_repository) Create transfer summary file"
   template:
     src: transfer_summary.json.j2
@@ -159,7 +121,6 @@
   run_once: true
   tags: [transfer, logging]
 
-# Nettoyage des anciens répertoires - tâches individuelles au lieu d'include_tasks
 - name: "(transfer_to_repository) Find timestamped directories for cleanup"
   find:
     paths: "{{ repository_base_path }}/{{ item }}"

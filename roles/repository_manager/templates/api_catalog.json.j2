@@ -1,0 +1,49 @@
+{
+  "api_info": {
+    "format": "{{ format_type }}",
+    "description": "{{ format_type | title }} reports API catalog",
+    "server": "{{ ansible_fqdn | default(ansible_hostname) }}",
+    "last_updated": "{{ ansible_date_time.iso8601 }}",
+    "content_type": "{% if format_type == 'json' %}application/json{% elif format_type == 'html' %}text/html{% elif format_type == 'excel' %}application/vnd.openxmlformats-officedocument.spreadsheetml.sheet{% endif %}"
+  },
+  "endpoints": {
+    "format_base": "/{{ format_type }}/",
+    "api_catalog": "/{{ format_type }}/api.json",
+    "latest_reports": "/{{ format_type }}/latest/",
+    "browse_all": "/{{ format_type }}/"
+  },
+  "available_timestamps": [
+    {% for timestamp in format_directories %}
+    {
+      "timestamp": "{{ timestamp }}",
+      "url": "/{{ format_type }}/{{ timestamp }}/",
+      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "latest": {
+    {% if format_directories | length > 0 %}
+    "timestamp": "{{ format_directories[0] }}",
+    "url": "/{{ format_type }}/latest/",
+    "direct_url": "/{{ format_type }}/{{ format_directories[0] }}/"
+    {% else %}
+    "timestamp": null,
+    "url": "/{{ format_type }}/latest/",
+    "direct_url": null
+    {% endif %}
+  },
+  "statistics": {
+    "total_archives": {{ format_directories | length }},
+    "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
+    "newest_timestamp": "{{ format_directories | first | default('N/A') }}"
+  },
+  "usage_examples": {
+    "list_all_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json",
+    "access_latest": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/",
+    {% if format_directories | length > 0 %}
+    "access_specific": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/{{ format_directories[0] }}/"
+    {% else %}
+    "access_specific": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/YYYYMMDDHHMMSS/"
+    {% endif %}
+  }
+}
