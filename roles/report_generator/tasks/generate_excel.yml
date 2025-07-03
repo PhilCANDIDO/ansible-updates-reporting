@@ -1,5 +1,5 @@
 ---
-- name: "(generate_excel) Check Python version and pip availability"
+- name: "(generate_excel) Check Python version and availability"
   command: python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
   register: python_version_check
   delegate_to: localhost
@@ -14,18 +14,6 @@
   run_once: true
   tags: [generation, excel, dependencies, info]
 
-- name: "(generate_excel) Ensure pip is available"
-  package:
-    name: 
-      - python3-pip
-      - python3-dev
-      - python3-setuptools
-    state: present
-  delegate_to: localhost
-  run_once: true
-  become: true
-  tags: [generation, excel, dependencies, pip]
-
 - name: "(generate_excel) Check if openpyxl is already installed"
   command: python3 -c "import openpyxl; print(openpyxl.__version__)"
   register: openpyxl_check
@@ -35,51 +23,118 @@
   changed_when: false
   tags: [generation, excel, dependencies, check]
 
-- name: "(generate_excel) Display openpyxl status"
+- name: "(generate_excel) Check if pandas is already installed"
+  command: python3 -c "import pandas; print(pandas.__version__)"
+  register: pandas_check
+  delegate_to: localhost
+  run_once: true
+  failed_when: false
+  changed_when: false
+  tags: [generation, excel, dependencies, check]
+
+- name: "(generate_excel) Display current package status"
   debug:
-    msg: "openpyxl status: {{ 'installed (version ' + openpyxl_check.stdout + ')' if openpyxl_check.rc == 0 else 'not installed' }}"
+    msg: |
+      Package status:
+      - openpyxl: {{ 'installed (version ' + openpyxl_check.stdout + ')' if openpyxl_check.rc == 0 else 'not installed' }}
+      - pandas: {{ 'installed (version ' + pandas_check.stdout + ')' if pandas_check.rc == 0 else 'not installed' }}
   delegate_to: localhost
   run_once: true
   tags: [generation, excel, dependencies, info]
 
-- name: "(generate_excel) Install Python Excel dependencies"
+- name: "(generate_excel) Install Python Excel dependencies via system packages (Debian/Ubuntu)"
+  package:
+    name:
+      - python3-openpyxl
+      - python3-pandas
+    state: present
+  delegate_to: localhost
+  run_once: true
+  become: true
+  when: 
+    - ansible_os_family == 'Debian'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+  register: system_package_install_debian
+  tags: [generation, excel, dependencies, install]
+
+- name: "(generate_excel) Install Python Excel dependencies via system packages (RedHat/CentOS)"
+  package:
+    name:
+      - python3-openpyxl
+      - python3-pandas
+    state: present
+  delegate_to: localhost
+  run_once: true
+  become: true
+  when: 
+    - ansible_os_family == 'RedHat'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+  register: system_package_install_redhat
+  ignore_errors: true
+  tags: [generation, excel, dependencies, install]
+
+- name: "(generate_excel) Install Python Excel dependencies via EPEL (RedHat/CentOS fallback)"
   pip:
     name:
       - openpyxl>=3.0.0
       - pandas>=1.3.0
     state: present
     executable: pip3
+    extra_args: "--break-system-packages"
   delegate_to: localhost
   run_once: true
   become: true
-  when: openpyxl_check.rc != 0
-  register: pip_install_result
+  when: 
+    - ansible_os_family == 'RedHat'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - system_package_install_redhat is defined
+    - system_package_install_redhat.failed
+  register: pip_install_redhat_fallback
   tags: [generation, excel, dependencies, install]
 
-- name: "(generate_excel) Verify openpyxl installation after pip install"
-  command: python3 -c "import openpyxl; import pandas; print('Dependencies OK')"
+- name: "(generate_excel) Install Python Excel dependencies via pip with break-system-packages (Last resort)"
+  pip:
+    name:
+      - openpyxl>=3.0.0
+      - pandas>=1.3.0
+    state: present
+    executable: pip3
+    extra_args: "--break-system-packages"
+  delegate_to: localhost
+  run_once: true
+  become: true
+  when: 
+    - ansible_os_family == 'Debian'
+    - (openpyxl_check.rc != 0 or pandas_check.rc != 0)
+    - system_package_install_debian is defined
+    - system_package_install_debian.failed
+  register: pip_install_debian_fallback
+  tags: [generation, excel, dependencies, install]
+
+- name: "(generate_excel) Verify dependencies installation"
+  command: python3 -c "import openpyxl; import pandas; print('Dependencies OK - openpyxl:', openpyxl.__version__, 'pandas:', pandas.__version__)"
   register: dependencies_verification
   delegate_to: localhost
   run_once: true
   changed_when: false
-  when: openpyxl_check.rc != 0
   tags: [generation, excel, dependencies, verify]
-
-- name: "(generate_excel) Handle dependency installation failure"
-  fail:
-    msg: |
-      Failed to install required Python dependencies for Excel generation.
-      Error: {{ pip_install_result.stderr | default('Unknown error') }}
-      Fallback: CSV generation will be used instead.
-  when: 
-    - openpyxl_check.rc != 0
-    - dependencies_verification is defined
-    - dependencies_verification.rc != 0
-  tags: [generation, excel, dependencies, error]
 
 - name: "(generate_excel) Set Excel generation capability flag"
   set_fact:
-    excel_generation_available: "{{ openpyxl_check.rc == 0 or (dependencies_verification is defined and dependencies_verification.rc == 0) }}"
+    excel_generation_available: "{{ dependencies_verification.rc == 0 }}"
+  delegate_to: localhost
+  run_once: true
+  tags: [generation, excel, dependencies, status]
+
+- name: "(generate_excel) Display dependency installation result"
+  debug:
+    msg: |
+      Excel generation dependencies: {{ 'Available' if excel_generation_available else 'Not Available' }}
+      {% if dependencies_verification.rc == 0 %}
+      {{ dependencies_verification.stdout }}
+      {% else %}
+      Error: {{ dependencies_verification.stderr | default('Unknown error') }}
+      {% endif %}
   delegate_to: localhost
   run_once: true
   tags: [generation, excel, dependencies, status]
@@ -118,7 +173,7 @@
     msg: |
       Excel file generated successfully:
       - File: {{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.xlsx
-      - Dependencies: openpyxl {{ openpyxl_check.stdout if openpyxl_check.rc == 0 else 'newly installed' }}
+      - Dependencies: {{ dependencies_verification.stdout if dependencies_verification.rc == 0 else 'Error' }}
   when: 
     - excel_generation_available | bool
     - excel_generation_result.rc == 0
@@ -134,6 +189,7 @@
       Fallback: Creating CSV file instead
   when: 
     - excel_generation_available | bool
+    - excel_generation_result is defined
     - excel_generation_result.rc != 0
   delegate_to: localhost
   run_once: true
@@ -149,19 +205,6 @@
   when: 
     - not (excel_generation_available | bool) or 
       (excel_generation_result is defined and excel_generation_result.rc != 0)
-  tags: [generation, excel, fallback]
-
-- name: "(generate_excel) Generate CSV fallback for failed Excel generation"
-  template:
-    src: consolidated_report.csv.j2
-    dest: "{{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.csv"
-    mode: '0644'
-  delegate_to: localhost
-  run_once: true
-  when: 
-    - excel_generation_available | bool
-    - excel_generation_result is defined
-    - excel_generation_result.rc != 0
   tags: [generation, excel, fallback]
 
 - name: "(generate_excel) Cleanup temporary files"
@@ -180,12 +223,12 @@
     msg: |
       Excel Report Generation Summary:
       - Excel dependencies available: {{ excel_generation_available | bool }}
-      - Generation method: {{ 'Excel (.xlsx)' if (excel_generation_available and excel_generation_result.rc == 0) else 'CSV fallback' }}
+      - Generation method: {{ 'Excel (.xlsx)' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'CSV fallback' }}
       - File location: {{ control_node_reports_path }}/excel/
-      - Filename: consolidated_report_{{ execution_id }}.{{ 'xlsx' if (excel_generation_available and excel_generation_result.rc == 0) else 'csv' }}
+      - Filename: consolidated_report_{{ execution_id }}.{{ 'xlsx' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'csv' }}
       - Hosts included: {{ aggregated_data.hosts | length }}
       - Errors included: {{ aggregated_data.errors | length }}
       - Python version: {{ python_version_check.stdout }}
-      - openpyxl status: {{ 'available' if excel_generation_available else 'not available' }}
+      - Installation method: {{ 'System packages' if (system_package_install_debian is defined and not system_package_install_debian.failed) or (system_package_install_redhat is defined and not system_package_install_redhat.failed) else 'pip with --break-system-packages' }}
   run_once: true
   tags: [generation, excel, summary]
