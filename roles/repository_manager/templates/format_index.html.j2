@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" x-data="formatBrowser()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ format_type | title }} Reports - Archive Browser</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.2em;
+            font-weight: 300;
+        }
+        .breadcrumb {
+            background: #ecf0f1;
+            padding: 15px 30px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .breadcrumb a {
+            color: #3498db;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            padding: 30px;
+        }
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 25px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s ease;
+        }
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .report-card {
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            padding: 20px;
+            background: #fafbfc;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .report-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        .report-card.latest {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        }
+        .report-timestamp {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .report-date {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        .report-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e1e8ed;
+        }
+        .stat-number {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .report-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .action-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+        .latest-badge {
+            background: #27ae60;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                {% if format_type == 'json' %}📄{% elif format_type == 'html' %}🌐{% elif format_type == 'excel' %}📊{% endif %}
+                {{ format_type | title }} Reports Archive
+            </h1>
+            <p>Browse and access {{ format_type }} format reports by timestamp</p>
+        </div>
+
+        <div class="breadcrumb">
+            <a href="/">🏠 Home</a> → <span>{{ format_type | title }} Reports</span>
+        </div>
+
+        <div class="content">
+            <div class="controls">
+                <input 
+                    type="text" 
+                    class="search-box" 
+                    placeholder="Search by timestamp, date, or report ID..."
+                    x-model="searchTerm"
+                    @input="filterReports()"
+                >
+                <button class="refresh-btn" @click="loadReports()">
+                    🔄 Refresh
+                </button>
+            </div>
+
+            <div x-show="loading" class="loading">
+                <p>📊 Loading reports...</p>
+            </div>
+
+            <div x-show="error" class="error" x-text="error"></div>
+
+            <div x-show="!loading && filteredReports.length === 0 && !error" class="empty-state">
+                <h3>No reports found</h3>
+                <p>No {{ format_type }} reports are available yet, or they don't match your search criteria.</p>
+            </div>
+
+            <div class="reports-grid" x-show="!loading && filteredReports.length > 0">
+                <template x-for="(report, index) in filteredReports" :key="report.timestamp">
+                    <div class="report-card" :class="{ 'latest': index === 0 }" @click="openReport(report)">
+                        <div class="report-timestamp">
+                            <span x-text="report.timestamp"></span>
+                            <span x-show="index === 0" class="latest-badge">Latest</span>
+                        </div>
+                        <div class="report-date" x-text="formatDate(report.timestamp)"></div>
+                        
+                        <div class="report-stats" x-show="report.summary">
+                            <div class="stat-item">
+                                <div class="stat-number" x-text="report.summary.total_hosts || 0"></div>
+                                <div class="stat-label">Hosts</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" x-text="report.summary.total_updates || 0"></div>
+                                <div class="stat-label">Updates</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" x-text="report.summary.security_updates || 0"></div>
+                                <div class="stat-label">Security</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" x-text="report.summary.critical_hosts || 0"></div>
+                                <div class="stat-label">Critical</div>
+                            </div>
+                        </div>
+
+                        <div class="report-actions">
+                            <a :href="'{{ format_type }}/' + report.timestamp + '/'" class="action-btn btn-primary">
+                                📁 Browse Files
+                            </a>
+                            {% if format_type == 'html' %}
+                            <a :href="'{{ format_type }}/' + report.timestamp + '/consolidated_report_' + report.execution_id + '.html'" class="action-btn btn-secondary">
+                                📊 View Report
+                            </a>
+                            {% elif format_type == 'json' %}
+                            <a :href="'{{ format_type }}/' + report.timestamp + '/consolidated_report_' + report.execution_id + '.json'" class="action-btn btn-secondary">
+                                📄 View JSON
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatBrowser() {
+            return {
+                reports: [],
+                filteredReports: [],
+                searchTerm: '',
+                loading: true,
+                error: null,
+
+                init() {
+                    this.loadReports();
+                },
+
+                async loadReports() {
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        // Dans un vrai environnement, ceci ferait un appel AJAX
+                        // Pour l'instant, nous simulons avec des données statiques
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Simulation de données - en production, ceci viendrait d'une API
+                        this.reports = await this.fetchReportsFromDirectory();
+                        this.filteredReports = [...this.reports];
+                        
+                    } catch (err) {
+                        this.error = 'Failed to load reports: ' + err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async fetchReportsFromDirectory() {
+                    // Simulation - en production, ceci utiliserait une API ou analyserait le DOM
+                    return [
+                        {
+                            timestamp: '20250703160449',
+                            execution_id: '20250703T160449',
+                            summary: {
+                                total_hosts: 4,
+                                total_updates: 477,
+                                security_updates: 72,
+                                critical_hosts: 1
+                            }
+                        }
+                        // Ajoutez d'autres rapports ici au fur et à mesure
+                    ];
+                },
+
+                filterReports() {
+                    if (!this.searchTerm) {
+                        this.filteredReports = [...this.reports];
+                        return;
+                    }
+                    
+                    const term = this.searchTerm.toLowerCase();
+                    this.filteredReports = this.reports.filter(report => 
+                        report.timestamp.toLowerCase().includes(term) ||
+                        report.execution_id.toLowerCase().includes(term) ||
+                        this.formatDate(report.timestamp).toLowerCase().includes(term)
+                    );
+                },
+
+                formatDate(timestamp) {
+                    // Format: YYYYMMDDhhmmss -> readable date
+                    const year = timestamp.substring(0, 4);
+                    const month = timestamp.substring(4, 6);
+                    const day = timestamp.substring(6, 8);
+                    const hour = timestamp.substring(8, 10);
+                    const minute = timestamp.substring(10, 12);
+                    const second = timestamp.substring(12, 14);
+                    
+                    return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+                },
+
+                openReport(report) {
+                    window.location.href = `{{ format_type }}/${report.timestamp}/`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

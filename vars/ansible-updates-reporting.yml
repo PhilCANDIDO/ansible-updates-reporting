@@ -4,6 +4,11 @@ repository_base_path: "/var/www/reports"
 repository_retention_days: 30
 webserver_type: "apache"  # nginx or apache
 
+# New timestamped storage configuration
+use_timestamped_directories: true
+timestamp_format: "%Y%m%d%H%M%S"  # Format: YYYYMMDDhhmmss
+max_archived_reports: 50  # Maximum number of timestamped directories to keep
+
 # Repository initialization control
 force_repository_setup: false  # Set to true to force re-initialization
 
@@ -21,6 +26,11 @@ report_formats:
   - html
   - excel
 
+# Enhanced web features
+enable_search_functionality: true
+enable_api_endpoints: true
+enable_directory_browsing: true
+
 # Notification configuration
 notification_recipients:
   - email: "security@company.com"
@@ -33,6 +43,15 @@ security_thresholds:
   critical_updates: 5
   security_updates: 10
   total_updates: 50
+
+# Web server performance settings
+enable_compression: true
+enable_caching: true
+cache_duration_minutes: 60
+
+# API configuration
+enable_cors: true
+api_cache_duration_minutes: 5
 
 # SMTP configuration (use Ansible Vault for sensitive data)
 # Note: Uncomment and configure these variables or use Ansible Vault

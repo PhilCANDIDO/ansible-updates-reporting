@@ -45,6 +45,11 @@
       when: use_repository_manager | bool
       tags: [repository, setup]
 
+    - name: "(repository_setup) Generate API endpoints after setup"
+      include_tasks: roles/repository_manager/tasks/generate_api_endpoints.yml
+      when: use_repository_manager | bool
+      tags: [repository, api]
+
 - name: "Collect Updates Information"
   hosts: all:!repository_managers
   gather_facts: true
@@ -78,6 +83,35 @@
       include_role:
         name: report_generator
       tags: [reporting, generation]
+
+- name: "Update Repository APIs and Indexes"
+  hosts: repository_managers
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+  tasks:
+    - name: "(repository_update) Regenerate API endpoints after report transfer"
+      include_tasks: roles/repository_manager/tasks/generate_api_endpoints.yml
+      when: use_repository_manager | bool
+      tags: [repository, api_update]
+
+    - name: "(repository_update) Update format indexes"
+      template:
+        src: roles/repository_manager/templates/format_index.html.j2
+        dest: "{{ repository_base_path }}/{{ item }}/index.html"
+        owner: "{{ current_webserver_user | default('www-data') }}"
+        group: "{{ current_webserver_group | default('www-data') }}"
+        mode: '0644'
+      loop: "{{ report_formats }}"
+      become: true
+      vars:
+        format_type: "{{ item }}"
+      when: use_repository_manager | bool
+      tags: [repository, index_update]
 
 - name: "Send Notifications"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"

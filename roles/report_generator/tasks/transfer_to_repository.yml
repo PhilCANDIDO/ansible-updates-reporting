@@ -5,9 +5,16 @@
   run_once: true
   tags: [transfer, connectivity]
 
-- name: "(transfer_to_repository) Ensure repository current directories exist"
+- name: "(transfer_to_repository) Generate transfer timestamp"
+  set_fact:
+    transfer_timestamp: "{{ ansible_date_time.strftime('%Y%m%d%H%M%S') }}"
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  run_once: true
+  tags: [transfer, timestamp]
+
+- name: "(transfer_to_repository) Create timestamped directories for each format"
   file:
-    path: "{{ repository_base_path }}/{{ item }}/current"
+    path: "{{ repository_base_path }}/{{ item }}/{{ transfer_timestamp }}"
     state: directory
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
@@ -18,64 +25,105 @@
   run_once: true
   tags: [transfer, directories]
 
-- name: "(transfer_to_repository) Transfer JSON reports to repository"
+- name: "(transfer_to_repository) Transfer JSON reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/json/"
-    dest: "{{ repository_base_path }}/json/current/"
+    dest: "{{ repository_base_path }}/json/{{ transfer_timestamp }}/"
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
-    backup: true
+    backup: false
   delegate_to: "{{ groups['repository_managers'][0] }}"
   become: true
   run_once: true
   when: "'json' in report_formats"
   tags: [transfer, json]
 
-- name: "(transfer_to_repository) Transfer HTML reports to repository"
+- name: "(transfer_to_repository) Transfer HTML reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/html/"
-    dest: "{{ repository_base_path }}/html/current/"
+    dest: "{{ repository_base_path }}/html/{{ transfer_timestamp }}/"
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
-    backup: true
+    backup: false
   delegate_to: "{{ groups['repository_managers'][0] }}"
   become: true
   run_once: true
   when: "'html' in report_formats"
   tags: [transfer, html]
 
-- name: "(transfer_to_repository) Transfer Excel reports to repository"
+- name: "(transfer_to_repository) Transfer Excel reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/excel/"
-    dest: "{{ repository_base_path }}/excel/current/"
+    dest: "{{ repository_base_path }}/excel/{{ transfer_timestamp }}/"
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
-    backup: true
+    backup: false
   delegate_to: "{{ groups['repository_managers'][0] }}"
   become: true
   run_once: true
   when: "'excel' in report_formats"
   tags: [transfer, excel]
 
-- name: "(transfer_to_repository) Create transfer summary file"
+- name: "(transfer_to_repository) Generate enhanced HTML index for timestamped directory"
   template:
-    src: transfer_summary.json.j2
-    dest: "{{ repository_base_path }}/logs/transfer_{{ execution_id }}.json"
+    src: timestamped_html_index.html.j2
+    dest: "{{ repository_base_path }}/html/{{ transfer_timestamp }}/index.html"
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
   delegate_to: "{{ groups['repository_managers'][0] }}"
   become: true
   run_once: true
+  when: "'html' in report_formats"
+  tags: [transfer, html, index]
+
+- name: "(transfer_to_repository) Create symbolic links to latest reports"
+  file:
+    src: "{{ repository_base_path }}/{{ item }}/{{ transfer_timestamp }}"
+    dest: "{{ repository_base_path }}/{{ item }}/latest"
+    state: link
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    force: true
+  loop: "{{ report_formats }}"
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, symlinks]
+
+- name: "(transfer_to_repository) Update format index files with new timestamp"
+  lineinfile:
+    path: "{{ repository_base_path }}/{{ item }}/index.html"
+    regexp: "<!-- TIMESTAMP_MARKER -->"
+    line: "                <!-- TIMESTAMP_MARKER -->"
+    insertbefore: "<!-- TIMESTAMP_MARKER -->"
+  loop: "{{ report_formats }}"
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  tags: [transfer, index_update]
+
+- name: "(transfer_to_repository) Create transfer summary file"
+  template:
+    src: transfer_summary.json.j2
+    dest: "{{ repository_base_path }}/logs/transfer_{{ transfer_timestamp }}.json"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  become: true
+  run_once: true
+  vars:
+    transfer_timestamp_var: "{{ transfer_timestamp }}"
   tags: [transfer, summary]
 
-- name: "(transfer_to_repository) Update repository index with latest execution"
+- name: "(transfer_to_repository) Update repository execution log"
   lineinfile:
     path: "{{ repository_base_path }}/logs/executions.log"
-    line: "{{ ansible_date_time.iso8601 }} - {{ execution_id }} - {{ aggregated_data.summary.total_hosts }} hosts - {{ aggregated_data.summary.total_updates }} updates - {{ aggregated_data.summary.total_security_updates }} security"
+    line: "{{ ansible_date_time.iso8601 }} - {{ execution_id }} - {{ transfer_timestamp }} - {{ aggregated_data.summary.total_hosts }} hosts - {{ aggregated_data.summary.total_updates }} updates - {{ aggregated_data.summary.total_security_updates }} security"
     create: true
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
@@ -84,6 +132,12 @@
   become: true
   run_once: true
   tags: [transfer, logging]
+
+- name: "(transfer_to_repository) Clean up old timestamped directories"
+  include_tasks: cleanup_old_reports.yml
+  delegate_to: "{{ groups['repository_managers'][0] }}"
+  run_once: true
+  tags: [transfer, cleanup]
 
 - name: "(transfer_to_repository) Cleanup control node temporary files"
   file:
@@ -99,10 +153,13 @@
     msg: |
       Repository Transfer Summary:
       - Repository server: {{ groups['repository_managers'][0] }}
+      - Transfer timestamp: {{ transfer_timestamp }}
       - Base path: {{ repository_base_path }}
       - Formats transferred: {{ report_formats | join(', ') }}
       - Execution ID: {{ execution_id }}
-      - Transfer timestamp: {{ ansible_date_time.iso8601 }}
+      - Transfer time: {{ ansible_date_time.iso8601 }}
+      - Timestamped directories created: {{ report_formats | map('regex_replace', '^(.*)$', repository_base_path + '/\\1/' + transfer_timestamp) | list | join(', ') }}
+      - Latest symlinks updated: Yes
       - Control node cleanup: {{ cleanup_control_node_files | default(true) }}
   run_once: true
   tags: [transfer, info]

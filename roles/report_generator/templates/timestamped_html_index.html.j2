@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" x-data="reportsViewer()">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Updates Reports - {{ transfer_timestamp }}</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .timestamp-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .breadcrumb {
+            background: #ecf0f1;
+            padding: 15px 30px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .breadcrumb a {
+            color: #3498db;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            padding: 30px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .reports-section {
+            margin: 30px 0;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .section-title {
+            color: #2c3e50;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        .search-container {
+            position: relative;
+            width: 300px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 25px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+        .clear-search {
+            position: absolute;
+            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .report-card {
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            padding: 20px;
+            background: #fafbfc;
+            transition: all 0.3s ease;
+        }
+        .report-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        .report-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .report-description {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+        .report-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .report-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        .report-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .individual-hosts {
+            margin-top: 30px;
+        }
+        .hosts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .host-card {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .host-card:hover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            transform: translateY(-2px);
+        }
+        .host-card.hidden {
+            display: none;
+        }
+        .host-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .host-info {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .host-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .host-stat {
+            text-align: center;
+        }
+        .host-stat-number {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .host-stat-label {
+            font-size: 0.7em;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .priority-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .priority-high { background: #ffebee; color: #c62828; }
+        .priority-medium { background: #fff3e0; color: #ef6c00; }
+        .priority-low { background: #e8f5e8; color: #2e7d32; }
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .footer {
+            background: #34495e;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 System Updates Reports</h1>
+            <div class="timestamp-badge">
+                Generated: {{ transfer_timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}
+            </div>
+        </div>
+
+        <div class="breadcrumb">
+            <a href="/">🏠 Home</a> → 
+            <a href="/html/">HTML Reports</a> → 
+            <span>{{ transfer_timestamp }}</span>
+        </div>
+
+        <div class="content">
+            <!-- Summary Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{{ aggregated_data.summary.total_hosts }}</div>
+                    <div class="stat-label">Total Hosts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ aggregated_data.summary.total_updates }}</div>
+                    <div class="stat-label">Total Updates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ aggregated_data.summary.total_security_updates }}</div>
+                    <div class="stat-label">Security Updates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ aggregated_data.summary.hosts_requiring_reboot }}</div>
+                    <div class="stat-label">Require Reboot</div>
+                </div>
+            </div>
+
+            <!-- Consolidated Reports -->
+            <div class="reports-section">
+                <div class="section-header">
+                    <h2 class="section-title">📋 Consolidated Reports</h2>
+                </div>
+                
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <div class="report-title">📄 Complete HTML Report</div>
+                        <div class="report-description">Comprehensive system overview with all hosts data</div>
+                        <div class="report-links">
+                            <a href="consolidated_report_{{ execution_id }}.html" class="report-link">View Report</a>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card">
+                        <div class="report-title">📧 Email Summary</div>
+                        <div class="report-description">Outlook-compatible summary for email distribution</div>
+                        <div class="report-links">
+                            <a href="email_summary_{{ execution_id }}.html" class="report-link">View Summary</a>
+                        </div>
+                    </div>
+
+                    {% if aggregated_data.errors | length > 0 %}
+                    <div class="report-card">
+                        <div class="report-title">⚠️ Error Report</div>
+                        <div class="report-description">Hosts with collection errors and troubleshooting</div>
+                        <div class="report-links">
+                            <a href="errors_{{ execution_id }}.html" class="report-link">View Errors</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Individual Host Reports -->
+            <div class="individual-hosts">
+                <div class="section-header">
+                    <h2 class="section-title">🖥️ Individual Host Reports ({{ aggregated_data.hosts | length }})</h2>
+                    <div class="search-container">
+                        <input 
+                            type="text" 
+                            class="search-input"
+                            placeholder="Search hosts..."
+                            x-model="searchTerm"
+                            @input="filterHosts()"
+                        >
+                        <button 
+                            class="clear-search"
+                            x-show="searchTerm"
+                            @click="clearSearch()"
+                        >×</button>
+                        <span class="search-icon">🔍</span>
+                    </div>
+                </div>
+
+                <div x-show="filteredHosts.length === 0 && searchTerm" class="no-results">
+                    <h3>No hosts found</h3>
+                    <p>No hosts match your search criteria: "<span x-text="searchTerm"></span>"</p>
+                </div>
+
+                <div class="hosts-grid">
+                    <template x-for="host in filteredHosts" :key="host.hostname">
+                        <div class="host-card" @click="openHostReport(host)">
+                            <div class="host-name" x-text="host.hostname"></div>
+                            <div class="host-info" x-text="host.distribution + ' ' + host.version"></div>
+                            
+                            <div class="host-stats">
+                                <div class="host-stat">
+                                    <div class="host-stat-number" x-text="host.total_updates"></div>
+                                    <div class="host-stat-label">Updates</div>
+                                </div>
+                                <div class="host-stat">
+                                    <div class="host-stat-number" x-text="host.security_updates"></div>
+                                    <div class="host-stat-label">Security</div>
+                                </div>
+                                <div class="host-stat">
+                                    <div class="host-stat-number" x-text="host.requires_reboot ? '✅' : '❌'"></div>
+                                    <div class="host-stat-label">Reboot</div>
+                                </div>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <span 
+                                    class="priority-badge"
+                                    :class="'priority-' + host.critical_level.toLowerCase()"
+                                    x-text="host.critical_level + ' Priority'"
+                                ></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Ansible Updates Reporting System</strong></p>
+            <p>Timestamp: {{ transfer_timestamp }} | 
+               Success Rate: {{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(1) }}%</p>
+        </div>
+    </div>
+
+    <script>
+        function reportsViewer() {
+            return {
+                searchTerm: '',
+                hosts: {{ aggregated_data.hosts | to_json }},
+                filteredHosts: {{ aggregated_data.hosts | to_json }},
+
+                init() {
+                    console.log('Reports viewer initialized with', this.hosts.length, 'hosts');
+                },
+
+                filterHosts() {
+                    if (!this.searchTerm) {
+                        this.filteredHosts = [...this.hosts];
+                        return;
+                    }
+
+                    const term = this.searchTerm.toLowerCase();
+                    this.filteredHosts = this.hosts.filter(host => 
+                        host.hostname.toLowerCase().includes(term) ||
+                        host.distribution.toLowerCase().includes(term) ||
+                        host.version.toLowerCase().includes(term) ||
+                        host.fqdn.toLowerCase().includes(term) ||
+                        host.ip_address.toLowerCase().includes(term) ||
+                        host.critical_level.toLowerCase().includes(term)
+                    );
+                },
+
+                clearSearch() {
+                    this.searchTerm = '';
+                    this.filterHosts();
+                },
+
+                openHostReport(host) {
+                    window.location.href = `${host.hostname}_{{ execution_id }}.html`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+---
+- name: "(cleanup_old_reports) Find timestamped directories for each format"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}"
+    file_type: directory
+    patterns: "[0-9]*"
+    excludes: 
+      - "archive"
+      - "latest"
+  register: timestamped_dirs
+  loop: "{{ report_formats }}"
+  tags: [cleanup, find]
+
+- name: "(cleanup_old_reports) Create combined list of all timestamped directories"
+  set_fact:
+    all_timestamped_dirs: "{{ timestamped_dirs.results | map(attribute='files') | flatten | map(attribute='path') | list }}"
+  tags: [cleanup, list]
+
+- name: "(cleanup_old_reports) Sort directories by timestamp (newest first)"
+  set_fact:
+    sorted_timestamped_dirs: "{{ all_timestamped_dirs | map('basename') | unique | sort(reverse=true) | list }}"
+  tags: [cleanup, sort]
+
+- name: "(cleanup_old_reports) Identify directories to remove (keep only recent ones)"
+  set_fact:
+    dirs_to_remove: "{{ sorted_timestamped_dirs[max_archived_reports | default(50):] }}"
+  when: sorted_timestamped_dirs | length > (max_archived_reports | default(50))
+  tags: [cleanup, identify]
+
+- name: "(cleanup_old_reports) Remove old timestamped directories"
+  file:
+    path: "{{ repository_base_path }}/{{ item[0] }}/{{ item[1] }}"
+    state: absent
+  loop: "{{ report_formats | product(dirs_to_remove | default([])) | list }}"
+  when: dirs_to_remove is defined and dirs_to_remove | length > 0
+  tags: [cleanup, remove]
+
+- name: "(cleanup_old_reports) Remove very old reports based on retention policy"
+  find:
+    paths: "{{ repository_base_path }}/{{ item }}"
+    file_type: directory
+    age: "{{ repository_retention_days }}d"
+    patterns: "[0-9]*"
+    excludes: 
+      - "archive"
+      - "latest"
+  register: old_timestamped_dirs
+  loop: "{{ report_formats }}"
+  tags: [cleanup, retention]
+
+- name: "(cleanup_old_reports) Remove directories older than retention policy"
+  file:
+    path: "{{ item.1.path }}"
+    state: absent
+  loop: "{{ old_timestamped_dirs.results | subelements('files', skip_missing=True) }}"
+  when: item.1.path is defined
+  tags: [cleanup, retention_remove]
+
+- name: "(cleanup_old_reports) Log cleanup activity"
+  lineinfile:
+    path: "{{ repository_base_path }}/logs/cleanup.log"
+    line: "{{ ansible_date_time.iso8601 }} - Cleanup: {{ dirs_to_remove | default([]) | length + (old_timestamped_dirs.results | map(attribute='files') | flatten | length) }} directories removed - Retention: {{ repository_retention_days }} days - Max archives: {{ max_archived_reports | default(50) }}"
+    create: true
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  tags: [cleanup, logging]
+
+- name: "(cleanup_old_reports) Display cleanup summary"
+  debug:
+    msg: |
+      Cleanup Summary:
+      - Total timestamped directories found: {{ sorted_timestamped_dirs | length }}
+      - Directories removed (count limit): {{ dirs_to_remove | default([]) | length }}
+      - Directories removed (age limit): {{ old_timestamped_dirs.results | map(attribute='files') | flatten | length }}
+      - Retention policy: {{ repository_retention_days }} days
+      - Max archives kept: {{ max_archived_reports | default(50) }}
+      - Remaining directories: {{ sorted_timestamped_dirs | length - (dirs_to_remove | default([]) | length) }}
+  tags: [cleanup, summary]

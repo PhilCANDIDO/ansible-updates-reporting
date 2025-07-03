@@ -1,10 +1,13 @@
 {
   "transfer_metadata": {
     "execution_id": "{{ execution_id }}",
-    "transfer_timestamp": "{{ ansible_date_time.iso8601 }}",
+    "transfer_timestamp": "{{ transfer_timestamp_var }}",
+    "generation_timestamp": "{{ ansible_date_time.iso8601 }}",
     "source_control_node": "{{ ansible_hostname }}",
     "destination_repository": "{{ groups['repository_managers'][0] }}",
-    "repository_path": "{{ repository_base_path }}"
+    "repository_path": "{{ repository_base_path }}",
+    "timestamped_storage": true,
+    "storage_structure": "{{ repository_base_path }}/{format}/{{ transfer_timestamp_var }}/"
   },
   "transfer_summary": {
     "formats_transferred": {{ report_formats | to_json }},
@@ -13,7 +16,13 @@
     "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
     "total_updates": {{ aggregated_data.summary.total_updates | int }},
     "security_updates": {{ aggregated_data.summary.total_security_updates | int }},
-    "critical_hosts": {{ aggregated_data.critical_hosts | length | int }}
+    "critical_hosts": {{ aggregated_data.critical_hosts | length | int }},
+    "timestamped_directories_created": [
+      {% for format in report_formats %}
+      "{{ repository_base_path }}/{{ format }}/{{ transfer_timestamp_var }}"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "latest_symlinks_updated": true
   },
   "file_manifest": {
     {% if 'json' in report_formats %}
@@ -39,9 +48,27 @@
     ]
     {% endif %}
   },
+  "web_access": {
+    "base_url": "http://{{ groups['repository_managers'][0] }}",
+    "timestamped_urls": {
+      {% for format in report_formats %}
+      "{{ format }}": "http://{{ groups['repository_managers'][0] }}/{{ format }}/{{ transfer_timestamp_var }}/"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    },
+    "latest_urls": {
+      {% for format in report_formats %}
+      "{{ format }}": "http://{{ groups['repository_managers'][0] }}/{{ format }}/latest/"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }
+  },
   "quality_metrics": {
     "data_completeness_percentage": {{ ((aggregated_data.hosts | length | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
     "error_rate_percentage": {{ ((aggregated_data.summary.hosts_with_errors | float / aggregated_data.summary.total_hosts | float) * 100) | round(2) }},
-    "security_coverage": "{{ 'HIGH' if aggregated_data.summary.total_security_updates > 0 else 'LOW' }}"
+    "security_coverage": "{{ 'HIGH' if aggregated_data.summary.total_security_updates > 0 else 'LOW' }}",
+    "archive_management": {
+      "retention_days": {{ repository_retention_days }},
+      "max_archived_reports": {{ max_archived_reports | default(50) }},
+      "cleanup_enabled": true
+    }
   }
 }

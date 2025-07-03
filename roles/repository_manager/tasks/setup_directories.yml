@@ -17,7 +17,7 @@
   become: true
   tags: [setup, directories]
 
-- name: "(setup_directories) Create report format subdirectories"
+- name: "(setup_directories) Create report format base directories"
   file:
     path: "{{ repository_base_path }}/{{ item }}"
     state: directory
@@ -28,14 +28,14 @@
   become: true
   tags: [setup, directories]
 
-- name: "(setup_directories) Create current and archive directories"
+- name: "(setup_directories) Create archives directory for each format"
   file:
-    path: "{{ repository_base_path }}/{{ item[1] }}/{{ item[0] }}"
+    path: "{{ repository_base_path }}/{{ item }}/archive"
     state: directory
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0755'
-  loop: "{{ report_formats | product(['current', 'archive']) | list }}"
+  loop: "{{ report_formats }}"
   become: true
   tags: [setup, directories]
 
@@ -49,12 +49,35 @@
   become: true
   tags: [setup, directories]
 
-- name: "(setup_directories) Create index.html for repository root"
+- name: "(setup_directories) Create assets directory for CSS/JS"
+  file:
+    path: "{{ repository_base_path }}/assets"
+    state: directory
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0755'
+  become: true
+  tags: [setup, directories]
+
+- name: "(setup_directories) Create main index.html for repository root"
   template:
-    src: index.html.j2
+    src: main_index.html.j2
     dest: "{{ repository_base_path }}/index.html"
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
   become: true
+  tags: [setup, directories, index]
+
+- name: "(setup_directories) Create format-specific index files"
+  template:
+    src: format_index.html.j2
+    dest: "{{ repository_base_path }}/{{ item }}/index.html"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
+    mode: '0644'
+  loop: "{{ report_formats }}"
+  become: true
+  vars:
+    format_type: "{{ item }}"
   tags: [setup, directories, index]

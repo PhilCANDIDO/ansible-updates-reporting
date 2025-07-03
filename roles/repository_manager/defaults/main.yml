@@ -12,6 +12,11 @@ report_formats:
   - html
   - excel
 
+# Archive structure configuration
+use_timestamped_directories: true
+timestamp_format: "%Y%m%d%H%M%S"  # Format: YYYYMMDDhhmmss
+max_archived_reports: 50  # Maximum number of timestamped directories to keep
+
 # Repository initialization control
 force_repository_setup: false
 
