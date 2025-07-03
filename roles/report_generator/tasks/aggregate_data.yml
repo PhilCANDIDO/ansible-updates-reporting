@@ -62,11 +62,30 @@
   run_once: true
   tags: [aggregation, grouping]
 
-- name: "(aggregate_data) Identify critical hosts"
+- name: "(aggregate_data) Set critical threshold as integer"
+  set_fact:
+    critical_threshold: "{{ security_thresholds.critical_updates | default(5) | int }}"
+  run_once: true
+  tags: [aggregation, critical]
+
+- name: "(aggregate_data) Identify critical hosts with proper type conversion"
+  set_fact:
+    critical_hosts_list: []
+  run_once: true
+  tags: [aggregation, critical]
+
+- name: "(aggregate_data) Build critical hosts list"
+  set_fact:
+    critical_hosts_list: "{{ critical_hosts_list + [item] }}"
+  loop: "{{ aggregated_data.hosts }}"
+  when: (item.security_updates | int) > critical_threshold
+  run_once: true
+  tags: [aggregation, critical]
+
+- name: "(aggregate_data) Update aggregated data with critical hosts"
   set_fact:
     aggregated_data: "{{ aggregated_data | combine({
-      'critical_hosts': aggregated_data.hosts | 
-      selectattr('security_updates', '>', (security_thresholds.critical_updates | int)) | list
+      'critical_hosts': critical_hosts_list
     }) }}"
   run_once: true
   tags: [aggregation, critical]

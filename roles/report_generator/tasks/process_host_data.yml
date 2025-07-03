@@ -11,6 +11,15 @@
     host_reachable: "{{ hostvars[target_host].ansible_facts is defined }}"
   tags: [processing, validation]
 
+- name: "(process_host_data) Calculate critical level for successful host {{ target_host }}"
+  set_fact:
+    security_count: "{{ hostvars[target_host].collected_updates.security_count | default(0) | int }}"
+    critical_threshold: "{{ security_thresholds.critical_updates | default(5) | int }}"
+  when: 
+    - host_reachable | bool
+    - host_has_updates | bool
+  tags: [processing, success]
+
 - name: "(process_host_data) Process successful host {{ target_host }}"
   set_fact:
     current_host_data:
@@ -27,7 +36,7 @@
       collection_method: "{{ hostvars[target_host].collected_updates.collection_method | default('unknown') }}"
       collection_timestamp: "{{ hostvars[target_host].collected_updates.collection_timestamp | default(ansible_date_time.iso8601) }}"
       requires_reboot: "{{ hostvars[target_host].collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0 }}"
-      critical_level: "{% set sec_count = hostvars[target_host].collected_updates.security_count | default(0) | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}"
+      critical_level: "{{ 'HIGH' if security_count > critical_threshold else ('MEDIUM' if security_count > 0 else 'LOW') }}"
       packages: "{{ hostvars[target_host].collected_updates.packages | default([]) }}"
       status: "success"
   when: 
