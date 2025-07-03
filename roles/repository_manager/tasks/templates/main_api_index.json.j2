@@ -55,8 +55,8 @@
     "total_formats": {{ report_formats | length }},
     "total_archived_reports": {{ all_directories | default([]) | length }},
     "available_timestamps": {{ all_directories | default([]) | to_json }},
-    "latest_timestamp": "{{ all_directories | default([]) | first | default('N/A') }}",
-    "oldest_timestamp": "{{ all_directories | default([]) | last | default('N/A') }}",
+    "latest_timestamp": {{ ("\"" + all_directories | default([]) | first + "\"") if all_directories | default([]) | length > 0 else "null" }},
+    "oldest_timestamp": {{ ("\"" + all_directories | default([]) | last + "\"") if all_directories | default([]) | length > 0 else "null" }},
     "retention_policy": {
       "max_archives": {{ max_archived_reports | default(50) }},
       "retention_days": {{ repository_retention_days | default(30) }},
@@ -75,25 +75,35 @@
       {% endfor %}
     },
     "consolidated_reports": {
+      {% set consolidated_items = [] %}
       {% for format in report_formats %}
-      {% if format == 'html' %}
-      "latest_html": "/{{ format }}/latest/consolidated_report.html",
-      "latest_email": "/{{ format }}/latest/email_summary.html"
-      {% elif format == 'json' %}
-      "latest_json": "/{{ format }}/latest/consolidated_report.json"
-      {% elif format == 'excel' %}
-      "latest_excel": "/{{ format }}/latest/consolidated_report.xlsx"
-      {% endif %}{% if not loop.last %},{% endif %}
+        {% if format == 'html' and all_directories | default([]) | length > 0 %}
+          {% set latest_timestamp = all_directories | first %}
+          {% set _ = consolidated_items.append('"latest_html": "/' + format + '/latest/consolidated_report_' + latest_timestamp + '.html"') %}
+          {% set _ = consolidated_items.append('"latest_email": "/' + format + '/latest/email_summary_' + latest_timestamp + '.html"') %}
+        {% elif format == 'json' and all_directories | default([]) | length > 0 %}
+          {% set latest_timestamp = all_directories | first %}
+          {% set _ = consolidated_items.append('"latest_json": "/' + format + '/latest/consolidated_report_' + latest_timestamp + '.json"') %}
+        {% elif format == 'excel' and all_directories | default([]) | length > 0 %}
+          {% set latest_timestamp = all_directories | first %}
+          {% set _ = consolidated_items.append('"latest_excel": "/' + format + '/latest/consolidated_report_' + latest_timestamp + '.xlsx"') %}
+        {% endif %}
       {% endfor %}
+      {{ consolidated_items | join(',\n      ') | safe }}
     }
   },
   "usage_examples": {
     "get_all_formats": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/api.json",
     "get_latest_html": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/latest/",
     "get_latest_json": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/latest/",
-    "list_json_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/api.json | jq '.available_timestamps'",
+    "list_json_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/json/api.json | jq '.available_timestamps[].timestamp'",
+    {% if all_directories | default([]) | length > 0 %}
     "get_specific_timestamp": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/{{ all_directories | default([]) | first | default('20250703160449') }}/",
     "download_excel": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/excel/latest/consolidated_report.xlsx"
+    {% else %}
+    "get_specific_timestamp": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/html/20250703160449/",
+    "download_excel": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/excel/latest/consolidated_report.xlsx"
+    {% endif %}
   },
   "integration_notes": {
     "cors": "CORS headers are enabled for API endpoints",
@@ -113,10 +123,8 @@
     "compression": {{ enable_compression | default(true) | lower }},
     "caching": {{ enable_caching | default(true) | lower }},
     "ssl_enabled": {{ enable_ssl | default(false) | lower }},
-    "firewall_configured": {{ configure_firewall | default(true) | lower }},
-    {% if ansible_os_family == 'RedHat' %}
-    "selinux_configured": {{ configure_selinux | default(true) | lower }},
-    {% endif %}
+    "firewall_configured": {{ configure_firewall | default(true) | lower }}{% if ansible_os_family == 'RedHat' %},
+    "selinux_configured": {{ configure_selinux | default(true) | lower }}{% endif %},
     "index_generation": "Dynamic index pages with search functionality"
   }
 }

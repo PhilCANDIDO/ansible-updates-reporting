@@ -46,8 +46,7 @@
     }
   },
   "quick_links": {
-    "latest_reports": "/{{ format_type }}/latest/",
-    {% if format_directories | length > 0 %}
+    "latest_reports": "/{{ format_type }}/latest/"{% if format_directories | length > 0 %},
     {% set latest_timestamp = format_directories | first %}
     {% if format_type == 'html' %}
     "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.html",
@@ -58,36 +57,33 @@
     "latest_index": "/{{ format_type }}/latest/index.json"
     {% elif format_type == 'excel' %}
     "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.xlsx"
-    {% endif %}
-    {% else %}
-    "note": "No reports available yet"
-    {% endif %}
+    {% endif %}{% endif %}
   },
   "navigation": {
     "parent_api": "/api.json",
     "main_repository": "/",
     "sibling_formats": {
+      {% set siblings = [] %}
       {% for fmt in report_formats %}
       {% if fmt != format_type %}
-      "{{ fmt }}": "/{{ fmt }}/api.json"{% if not loop.last %},{% endif %}
+      {% set _ = siblings.append('"' + fmt + '": "/' + fmt + '/api.json"') %}
       {% endif %}
       {% endfor %}
+      {{ siblings | join(',\n      ') | safe }}
     }
   },
   "usage_examples": {
     "browse_latest": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/",
-    "get_api_info": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json"
-    {% if format_directories | length > 0 %}
+    "get_api_info": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json"{% if format_directories | length > 0 %},
     {% set latest_timestamp = format_directories | first %}
     {% if format_type == 'json' %}
-    ,"get_latest_report": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.json | jq .",
+    "get_latest_report": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.json | jq .",
     "list_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json | jq '.available_timestamps[].timestamp'"
     {% elif format_type == 'html' %}
-    ,"view_latest_report": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.html"
+    "view_latest_report": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.html"
     {% elif format_type == 'excel' %}
-    ,"download_latest": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.xlsx"
-    {% endif %}
-    {% endif %}
+    "download_latest": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.xlsx"
+    {% endif %}{% endif %}
   },
   "repository_info": {
     "webserver_type": "{{ webserver_type | default('apache') }}",
