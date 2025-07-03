@@ -13,8 +13,26 @@
 
 - name: "(process_host_data) Calculate critical level for successful host {{ target_host }}"
   set_fact:
+    # Conversion explicite en entier pour éviter les erreurs de comparaison
     security_count: "{{ hostvars[target_host].collected_updates.security_count | default(0) | int }}"
+    total_count: "{{ hostvars[target_host].collected_updates.total_count | default(0) | int }}"
     critical_threshold: "{{ security_thresholds.critical_updates | default(5) | int }}"
+  when: 
+    - host_reachable | bool
+    - host_has_updates | bool
+  tags: [processing, success]
+
+- name: "(process_host_data) Determine critical level for {{ target_host }}"
+  set_fact:
+    host_critical_level: "{% if security_count | int > critical_threshold | int %}HIGH{% elif security_count | int > 0 %}MEDIUM{% else %}LOW{% endif %}"
+  when: 
+    - host_reachable | bool
+    - host_has_updates | bool
+  tags: [processing, success]
+
+- name: "(process_host_data) Check packages requiring reboot for {{ target_host }}"
+  set_fact:
+    packages_requiring_reboot: "{{ hostvars[target_host].collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list }}"
   when: 
     - host_reachable | bool
     - host_has_updates | bool
@@ -31,12 +49,12 @@
       architecture: "{{ hostvars[target_host].os_detection.architecture | default(hostvars[target_host].ansible_architecture | default('Unknown')) }}"
       kernel: "{{ hostvars[target_host].ansible_kernel | default('N/A') }}"
       uptime_seconds: "{{ hostvars[target_host].ansible_uptime_seconds | default(0) | int }}"
-      total_updates: "{{ hostvars[target_host].collected_updates.total_count | default(0) | int }}"
-      security_updates: "{{ hostvars[target_host].collected_updates.security_count | default(0) | int }}"
+      total_updates: "{{ total_count | int }}"
+      security_updates: "{{ security_count | int }}"
       collection_method: "{{ hostvars[target_host].collected_updates.collection_method | default('unknown') }}"
       collection_timestamp: "{{ hostvars[target_host].collected_updates.collection_timestamp | default(ansible_date_time.iso8601) }}"
-      requires_reboot: "{{ hostvars[target_host].collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list | length > 0 }}"
-      critical_level: "{{ 'HIGH' if security_count > critical_threshold else ('MEDIUM' if security_count > 0 else 'LOW') }}"
+      requires_reboot: "{{ packages_requiring_reboot | length > 0 }}"
+      critical_level: "{{ host_critical_level }}"
       packages: "{{ hostvars[target_host].collected_updates.packages | default([]) }}"
       status: "success"
   when: 
@@ -127,4 +145,5 @@
       - Status: {{ current_host_data.status | default('unknown') }}
       - Updates: {{ current_host_data.total_updates | default(0) }}
       - Security: {{ current_host_data.security_updates | default(0) }}
+      - Critical Level: {{ current_host_data.critical_level | default('UNKNOWN') }}
   tags: [processing, debug]

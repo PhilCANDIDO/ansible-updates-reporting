@@ -18,7 +18,7 @@
   "updates_summary": {
     "total_updates": {{ collected_updates.total_count | default(0) | int }},
     "security_updates": {{ collected_updates.security_count | default(0) | int }},
-    "critical_level": "{% set sec_count = collected_updates.security_count | default(0) | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}",
+    "critical_level": {% set sec_count = collected_updates.security_count | default(0) | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}"{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}",
     "collection_method": "{{ collected_updates.collection_method | default('unknown') }}",
     "requires_reboot": {% set reboot_packages = collected_updates.packages | default([]) | selectattr('requires_reboot', 'defined') | selectattr('requires_reboot', 'equalto', true) | list %}{{ (reboot_packages | length > 0) | lower }}
   },

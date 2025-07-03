@@ -74,11 +74,11 @@
   run_once: true
   tags: [aggregation, critical]
 
-- name: "(aggregate_data) Build critical hosts list"
+- name: "(aggregate_data) Build critical hosts list with type safety"
   set_fact:
     critical_hosts_list: "{{ critical_hosts_list + [item] }}"
   loop: "{{ aggregated_data.hosts }}"
-  when: (item.security_updates | int) > critical_threshold
+  when: (item.security_updates | int) > (critical_threshold | int)
   run_once: true
   tags: [aggregation, critical]
 
