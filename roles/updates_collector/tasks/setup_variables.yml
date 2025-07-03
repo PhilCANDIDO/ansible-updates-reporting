@@ -1,4 +1,21 @@
 ---
+- name: "(setup_variables) Check Python version compatibility"
+  shell: |
+    python3 --version 2>/dev/null || python --version 2>/dev/null || echo "No Python found"
+  register: python_version_check
+  changed_when: false
+  failed_when: false
+  tags: [setup, variables, python]
+
+- name: "(setup_variables) Set Python interpreter based on availability"
+  set_fact:
+    ansible_python_interpreter: "{{ 
+      '/usr/bin/python3' if ansible_python_interpreter is not defined and 
+      (python_version_check.stdout | regex_search('Python 3\\.')) else 
+      ansible_python_interpreter | default('auto_legacy_silent') 
+    }}"
+  tags: [setup, variables, python]
+
 - name: "(setup_variables) Ensure execution_id is defined"
   set_fact:
     execution_id: "{{ execution_id | default(ansible_date_time.iso8601_basic_short) }}"
@@ -8,9 +25,9 @@
 - name: "(setup_variables) Set default security thresholds if not defined"
   set_fact:
     security_thresholds:
-      critical_updates: "{{ security_thresholds.critical_updates | default(5) }}"
-      security_updates: "{{ security_thresholds.security_updates | default(10) }}"
-      total_updates: "{{ security_thresholds.total_updates | default(50) }}"
+      critical_updates: "{{ security_thresholds.critical_updates | default(5) | int }}"
+      security_updates: "{{ security_thresholds.security_updates | default(10) | int }}"
+      total_updates: "{{ security_thresholds.total_updates | default(50) | int }}"
   when: security_thresholds is not defined
   tags: [setup, variables]
 
@@ -22,8 +39,19 @@
 
 - name: "(setup_variables) Set default use_repository_manager if not defined"
   set_fact:
-    use_repository_manager: "{{ use_repository_manager | default(false) }}"
+    use_repository_manager: "{{ use_repository_manager | default(false) | bool }}"
   when: use_repository_manager is not defined
+  tags: [setup, variables]
+
+- name: "(setup_variables) Initialize collected_updates structure"
+  set_fact:
+    collected_updates:
+      total_count: 0
+      security_count: 0
+      packages: []
+      collection_method: "unknown"
+      collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+  when: collected_updates is not defined
   tags: [setup, variables]
 
 - name: "(setup_variables) Display variable status"
@@ -34,4 +62,6 @@
       - use_repository_manager: {{ use_repository_manager }}
       - local_reports_path: {{ local_reports_path }}
       - security_thresholds: {{ security_thresholds }}
+      - python_interpreter: {{ ansible_python_interpreter }}
+      - python_version: {{ python_version_check.stdout | default('unknown') }}
   tags: [setup, variables, debug]

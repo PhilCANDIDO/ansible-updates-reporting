@@ -17,20 +17,22 @@
     </style>
 </head>
 <body>
-    <div class="header {{ 'critical' if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates else 'warning' if consolidated_data.summary.total_security_updates > 0 else 'info' }}">
+    {% set sec_count = consolidated_data.summary.total_security_updates | int %}
+    {% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}
+    <div class="header {{ 'critical' if sec_count > crit_threshold else 'warning' if sec_count > 0 else 'info' }}">
         <h1>System Updates Report</h1>
         <p><strong>Execution ID:</strong> {{ execution_id }}</p>
         <p><strong>Generated:</strong> {{ ansible_date_time.iso8601 }}</p>
-        <p><strong>Priority:</strong> {{ 'HIGH' if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates else 'MEDIUM' if consolidated_data.summary.total_security_updates > 0 else 'LOW' }}</p>
+        <p><strong>Priority:</strong> {{ 'HIGH' if sec_count > crit_threshold else 'MEDIUM' if sec_count > 0 else 'LOW' }}</p>
     </div>
 
     <div class="summary">
         <h2>Summary</h2>
         <ul>
-            <li><strong>Total Hosts:</strong> {{ consolidated_data.summary.total_hosts }}</li>
-            <li><strong>Total Updates:</strong> {{ consolidated_data.summary.total_updates }}</li>
-            <li><strong>Security Updates:</strong> {{ consolidated_data.summary.total_security_updates }}</li>
-            <li><strong>Hosts Requiring Reboot:</strong> {{ consolidated_data.summary.hosts_requiring_reboot }}</li>
+            <li><strong>Total Hosts:</strong> {{ consolidated_data.summary.total_hosts | int }}</li>
+            <li><strong>Total Updates:</strong> {{ consolidated_data.summary.total_updates | int }}</li>
+            <li><strong>Security Updates:</strong> {{ consolidated_data.summary.total_security_updates | int }}</li>
+            <li><strong>Hosts Requiring Reboot:</strong> {{ consolidated_data.summary.hosts_requiring_reboot | int }}</li>
         </ul>
     </div>
 
@@ -51,8 +53,8 @@
                 <tr>
                     <td>{{ host.metadata.hostname }}</td>
                     <td>{{ host.system_info.distribution }} {{ host.system_info.version }}</td>
-                    <td>{{ host.updates_summary.security_updates }}</td>
-                    <td>{{ host.updates_summary.total_updates }}</td>
+                    <td>{{ host.updates_summary.security_updates | int }}</td>
+                    <td>{{ host.updates_summary.total_updates | int }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -77,8 +79,8 @@
                 <tr>
                     <td>{{ host.hostname }}</td>
                     <td>{{ host.distribution }} {{ host.version }}</td>
-                    <td>{{ host.security_updates }}</td>
-                    <td>{{ host.total_updates }}</td>
+                    <td>{{ host.security_updates | int }}</td>
+                    <td>{{ host.total_updates | int }}</td>
                     <td>{{ 'Yes' if host.requires_reboot else 'No' }}</td>
                 </tr>
                 {% endfor %}
@@ -88,10 +90,10 @@
 
     <div class="summary">
         <h2>Actions Required</h2>
-        {% if consolidated_data.summary.total_security_updates > security_thresholds.critical_updates %}
-        <p><strong>⚠️ CRITICAL:</strong> {{ consolidated_data.summary.total_security_updates }} security updates detected across {{ consolidated_data.summary.total_hosts }} hosts. Immediate action required.</p>
-        {% elif consolidated_data.summary.total_security_updates > 0 %}
-        <p><strong>⚠️ WARNING:</strong> {{ consolidated_data.summary.total_security_updates }} security updates detected. Schedule maintenance window.</p>
+        {% if sec_count > crit_threshold %}
+        <p><strong>⚠️ CRITICAL:</strong> {{ sec_count }} security updates detected across {{ consolidated_data.summary.total_hosts | int }} hosts. Immediate action required.</p>
+        {% elif sec_count > 0 %}
+        <p><strong>⚠️ WARNING:</strong> {{ sec_count }} security updates detected. Schedule maintenance window.</p>
         {% else %}
         <p><strong>✅ INFO:</strong> No security updates detected. Regular maintenance recommended.</p>
         {% endif %}
