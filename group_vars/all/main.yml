@@ -2,48 +2,4 @@
 # Common ansible options
 ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30'
 ansible_user: "deploy"
-
-# Repository Manager Configuration
-use_repository_manager: true  # Activé par défaut
-repository_base_path: "/var/www/reports"
-repository_retention_days: 30
-webserver_type: "nginx"  # nginx or apache
-
-# Repository initialization control
-force_repository_setup: false  # Set to true to force re-initialization
-
-# Alternative storage when repository is disabled
-local_reports_path: "/tmp/ansible-reports"
-local_reports_retention_hours: 24
-
-# Execution configuration
-updates_collection_serial: "50%"
-send_notifications: true
-
-# Report configuration
-report_formats:
-  - json
-  - html
-  - excel
-
-# Notification configuration
-notification_recipients:
-  - email: "security@company.com"
-    type: "security"
-  - email: "ops@company.com"
-    type: "operations"
-
-# Security thresholds
-security_thresholds:
-  critical_updates: 5
-  security_updates: 10
-  total_updates: 50
-
-# SMTP configuration (use Ansible Vault for sensitive data)
-smtp_server: "{{ vault_smtp_server }}"
-smtp_port: "{{ vault_smtp_port | default(587) }}"
-smtp_username: "{{ vault_smtp_username }}"
-smtp_password: "{{ vault_smtp_password }}"
-smtp_use_tls: "{{ vault_smtp_use_tls | default(true) }}"
-smtp_from: "{{ vault_smtp_from | default('ansible-reports@company.com') }}"
-
+ansible_become_user: root

@@ -5,20 +5,20 @@ webserver_packages:
     - nginx
     - python3-pip
   apache:
-    - apache2
+    - httpd
     - python3-pip
 
 webserver_service:
   nginx: nginx
-  apache: apache2
+  apache: httpd
 
 webserver_config_path:
   nginx: "/etc/nginx/sites-available"
-  apache: "/etc/apache2/sites-available"
+  apache: "/etc/httpd/conf.d/"
 
 webserver_enabled_path:
   nginx: "/etc/nginx/sites-enabled"
-  apache: "/etc/apache2/sites-enabled"
+  apache: "/etc/httpd/conf.d/"
 
 # Web server security
 webserver_security:

@@ -2,6 +2,9 @@
 - name: "Ansible Updates Reporting Pipeline"
   hosts: localhost
   gather_facts: false
+  become: true
+  vars_files:
+    - vars/ansible-updates-reporting.yml
   vars:
     execution_timestamp: "{{ ansible_date_time.epoch }}"
     execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
@@ -22,6 +25,8 @@
 - name: "Setup Repository Manager"
   hosts: repository_managers
   gather_facts: true
+  vars_files:
+    - vars/ansible-updates-reporting.yml
   vars:
     use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
   tasks:
@@ -35,6 +40,8 @@
   hosts: all:!repository_managers
   gather_facts: true
   serial: "{{ updates_collection_serial | default('100%') }}"
+  vars_files:
+    - vars/ansible-updates-reporting.yml
   vars:
     use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     # Transmettre l'information aux rôles
@@ -48,6 +55,8 @@
 - name: "Generate Consolidated Reports"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
   gather_facts: true
+  vars_files:
+    - vars/ansible-updates-reporting.yml
   vars:
     use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
@@ -60,6 +69,8 @@
 - name: "Send Notifications"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
   gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
   vars:
     use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
