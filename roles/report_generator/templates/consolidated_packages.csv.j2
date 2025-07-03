@@ -1,0 +1,10 @@
+Hostname,FQDN,IP Address,Distribution,Version,Architecture,Package Name,Current Version,Available Version,Is Security,Requires Reboot,Repository,Collection Method,Collection Timestamp
+{% for host in aggregated_data.hosts -%}
+{% if host.packages and host.packages | length > 0 -%}
+{% for package in host.packages -%}
+"{{ host.hostname }}","{{ host.fqdn }}","{{ host.ip_address }}","{{ host.distribution }}","{{ host.version }}","{{ host.architecture }}","{{ package.name }}","{{ package.current_version }}","{{ package.available_version }}","{{ 'Yes' if package.is_security else 'No' }}","{{ 'Yes' if package.requires_reboot else 'No' }}","{{ package.repository | default('N/A') }}","{{ host.collection_method }}","{{ host.collection_timestamp }}"
+{% endfor -%}
+{% else -%}
+"{{ host.hostname }}","{{ host.fqdn }}","{{ host.ip_address }}","{{ host.distribution }}","{{ host.version }}","{{ host.architecture }}","No updates available","N/A","N/A","No","No","N/A","{{ host.collection_method }}","{{ host.collection_timestamp }}"
+{% endif -%}
+{% endfor %}

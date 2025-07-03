@@ -241,7 +241,7 @@
     msg: |
       Excel generation failed: {{ excel_generation_result.stderr | default('Unknown error') }}
       Stdout: {{ excel_generation_result.stdout | default('No output') }}
-      Fallback: Creating CSV file instead
+      Fallback: Creating detailed CSV file instead
   when: 
     - excel_generation_available | bool
     - excel_generation_result is defined
@@ -250,10 +250,22 @@
   run_once: true
   tags: [generation, excel, error]
 
-- name: "(generate_excel) Generate CSV fallback when Excel not available"
+- name: "(generate_excel) Generate detailed CSV fallback when Excel not available"
+  template:
+    src: consolidated_packages.csv.j2
+    dest: "{{ control_node_reports_path }}/excel/consolidated_packages_{{ execution_id }}.csv"
+    mode: '0644'
+  delegate_to: localhost
+  run_once: true
+  when: 
+    - not (excel_generation_available | bool) or 
+      (excel_generation_result is defined and excel_generation_result.rc != 0)
+  tags: [generation, excel, fallback]
+
+- name: "(generate_excel) Generate summary CSV fallback when Excel not available"
   template:
     src: consolidated_report.csv.j2
-    dest: "{{ control_node_reports_path }}/excel/consolidated_report_{{ execution_id }}.csv"
+    dest: "{{ control_node_reports_path }}/excel/consolidated_summary_{{ execution_id }}.csv"
     mode: '0644'
   delegate_to: localhost
   run_once: true
@@ -281,8 +293,10 @@
       - Excel dependencies available: {{ excel_generation_available | bool }}
       - Generation method: {{ 'Excel (.xlsx)' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'CSV fallback' }}
       - File location: {{ control_node_reports_path }}/excel/
-      - Filename: consolidated_report_{{ execution_id }}.{{ 'xlsx' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'csv' }}
+      - Main file: consolidated_{{ 'report_' + execution_id + '.xlsx' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'packages_' + execution_id + '.csv' }}
+      - Additional files: {{ 'None' if (excel_generation_available and excel_generation_result is defined and excel_generation_result.rc == 0) else 'consolidated_summary_' + execution_id + '.csv' }}
       - Hosts included: {{ aggregated_data.hosts | length }}
+      - Packages included: {{ aggregated_data.hosts | map(attribute='packages') | map('length') | sum }}
       - Errors included: {{ aggregated_data.errors | length }}
       - Python version: {{ python_version_check.stdout }}
   run_once: true
