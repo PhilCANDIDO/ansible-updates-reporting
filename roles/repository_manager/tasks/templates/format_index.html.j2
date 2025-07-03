@@ -276,11 +276,11 @@
                                 📁 Browse Files
                             </a>
                             {% if format_type == 'html' %}
-                            <a :href="report.timestamp + '/consolidated_report_' + report.execution_id + '.html'" class="action-btn btn-secondary" @click.stop>
+                            <a :href="report.timestamp + '/consolidated_report_' + report.timestamp + '.html'" class="action-btn btn-secondary" @click.stop>
                                 📊 View Report
                             </a>
                             {% elif format_type == 'json' %}
-                            <a :href="report.timestamp + '/consolidated_report_' + report.execution_id + '.json'" class="action-btn btn-secondary" @click.stop>
+                            <a :href="report.timestamp + '/consolidated_report_' + report.timestamp + '.json'" class="action-btn btn-secondary" @click.stop>
                                 📄 View JSON
                             </a>
                             {% endif %}
@@ -317,18 +317,42 @@
                         
                         const apiData = await response.json();
                         
-                        // Transformer les timestamps en objets avec métadonnées
-                        this.reports = apiData.available_timestamps.map(item => ({
-                            timestamp: item.timestamp,
-                            execution_id: item.timestamp.replace('T', ''),  // Utiliser le timestamp comme execution_id de base
-                            formatted_date: item.formatted_date,
-                            summary: {
-                                total_hosts: 0,  // Ces données ne sont pas disponibles dans l'API
-                                total_updates: 0,
-                                security_updates: 0,
-                                critical_hosts: 0
-                            }
-                        }));
+                        // Transformer les timestamps en objets avec métadonnées enrichies
+                        this.reports = await Promise.all(
+                            apiData.available_timestamps.map(async (item) => {
+                                let summary = {
+                                    total_hosts: 0,
+                                    total_updates: 0,
+                                    security_updates: 0,
+                                    critical_hosts: 0
+                                };
+
+                                // Essayer de récupérer les métadonnées du rapport consolidé
+                                try {
+                                    {% if format_type == 'json' %}
+                                    const reportResponse = await fetch(`/${format_type}/${item.timestamp}/consolidated_report_${item.timestamp}.json`);
+                                    if (reportResponse.ok) {
+                                        const reportData = await reportResponse.json();
+                                        summary = {
+                                            total_hosts: reportData.summary?.total_hosts || 0,
+                                            total_updates: reportData.summary?.total_updates || 0,
+                                            security_updates: reportData.summary?.total_security_updates || 0,
+                                            critical_hosts: reportData.critical_hosts?.length || 0
+                                        };
+                                    }
+                                    {% endif %}
+                                } catch (err) {
+                                    console.warn(`Could not load summary for ${item.timestamp}:`, err);
+                                }
+
+                                return {
+                                    timestamp: item.timestamp,
+                                    execution_id: item.timestamp,
+                                    formatted_date: item.formatted_date,
+                                    summary: summary
+                                };
+                            })
+                        );
                         
                         this.filteredReports = [...this.reports];
                         

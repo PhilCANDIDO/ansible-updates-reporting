@@ -1,32 +1,17 @@
 ---
-- name: "(transfer_to_repository) Verify repository manager connectivity"
-  ping:
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, connectivity]
+# Correctif pour synchroniser les execution_id et URLs
+# roles/report_generator/tasks/transfer_to_repository.yml - SECTION À CORRIGER
 
-- name: "(transfer_to_repository) Generate transfer timestamp"
+- name: "(transfer_to_repository) Use consistent execution_id for directory naming"
   set_fact:
-    transfer_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    transfer_timestamp: "{{ execution_id }}"  # CHANGEMENT: Utiliser execution_id au lieu de ansible_date_time.iso8601_basic_short
   delegate_to: "{{ groups['repository_managers'][0] }}"
   run_once: true
   tags: [transfer, timestamp]
 
-- name: "(transfer_to_repository) Ensure logs directory exists"
-  file:
-    path: "{{ repository_base_path }}/logs"
-    state: directory
-    owner: "{{ current_webserver_user | default('www-data') }}"
-    group: "{{ current_webserver_group | default('www-data') }}"
-    mode: '0755'
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, directories, logs]
-
 - name: "(transfer_to_repository) Create timestamped directories for each format"
   file:
-    path: "{{ repository_base_path }}/{{ item }}/{{ transfer_timestamp }}"
+    path: "{{ repository_base_path }}/{{ item }}/{{ execution_id }}"  # CHANGEMENT: Utiliser execution_id
     state: directory
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
@@ -40,7 +25,7 @@
 - name: "(transfer_to_repository) Transfer JSON reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/json/"
-    dest: "{{ repository_base_path }}/json/{{ transfer_timestamp }}/"
+    dest: "{{ repository_base_path }}/json/{{ execution_id }}/"  # CHANGEMENT: Utiliser execution_id
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
@@ -54,7 +39,7 @@
 - name: "(transfer_to_repository) Transfer HTML reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/html/"
-    dest: "{{ repository_base_path }}/html/{{ transfer_timestamp }}/"
+    dest: "{{ repository_base_path }}/html/{{ execution_id }}/"  # CHANGEMENT: Utiliser execution_id
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
@@ -68,7 +53,7 @@
 - name: "(transfer_to_repository) Transfer Excel reports to timestamped directory"
   copy:
     src: "{{ control_node_reports_path }}/excel/"
-    dest: "{{ repository_base_path }}/excel/{{ transfer_timestamp }}/"
+    dest: "{{ repository_base_path }}/excel/{{ execution_id }}/"  # CHANGEMENT: Utiliser execution_id
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
@@ -82,7 +67,7 @@
 - name: "(transfer_to_repository) Generate enhanced HTML index for timestamped directory"
   template:
     src: timestamped_html_index.html.j2
-    dest: "{{ repository_base_path }}/html/{{ transfer_timestamp }}/index.html"
+    dest: "{{ repository_base_path }}/html/{{ execution_id }}/index.html"  # CHANGEMENT: Utiliser execution_id
     owner: "{{ current_webserver_user | default('www-data') }}"
     group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
@@ -90,11 +75,13 @@
   become: true
   run_once: true
   when: "'html' in report_formats"
+  vars:
+    transfer_timestamp: "{{ execution_id }}"  # CHANGEMENT: Passer execution_id au template
   tags: [transfer, html, index]
 
 - name: "(transfer_to_repository) Create symbolic links to latest reports"
   file:
-    src: "{{ repository_base_path }}/{{ item }}/{{ transfer_timestamp }}"
+    src: "{{ repository_base_path }}/{{ item }}/{{ execution_id }}"  # CHANGEMENT: Utiliser execution_id
     dest: "{{ repository_base_path }}/{{ item }}/latest"
     state: link
     owner: "{{ current_webserver_user | default('www-data') }}"
@@ -105,142 +92,3 @@
   become: true
   run_once: true
   tags: [transfer, symlinks]
-
-- name: "(transfer_to_repository) Create transfer summary file"
-  template:
-    src: transfer_summary.json.j2
-    dest: "{{ repository_base_path }}/logs/transfer_{{ transfer_timestamp }}.json"
-    owner: "{{ current_webserver_user | default('www-data') }}"
-    group: "{{ current_webserver_group | default('www-data') }}"
-    mode: '0644'
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  vars:
-    transfer_timestamp_var: "{{ transfer_timestamp }}"
-  tags: [transfer, summary]
-
-- name: "(transfer_to_repository) Update repository execution log"
-  lineinfile:
-    path: "{{ repository_base_path }}/logs/executions.log"
-    line: "{{ ansible_date_time.iso8601 }} - {{ execution_id }} - {{ transfer_timestamp }} - {{ aggregated_data.summary.total_hosts }} hosts - {{ aggregated_data.summary.total_updates }} updates - {{ aggregated_data.summary.total_security_updates }} security"
-    create: true
-    owner: "{{ current_webserver_user | default('www-data') }}"
-    group: "{{ current_webserver_group | default('www-data') }}"
-    mode: '0644'
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, logging]
-
-- name: "(transfer_to_repository) Find timestamped directories for cleanup"
-  find:
-    paths: "{{ repository_base_path }}/{{ item }}"
-    file_type: directory
-    patterns: "[0-9]*"
-    excludes: 
-      - "archive"
-      - "latest"
-  register: timestamped_dirs_cleanup
-  loop: "{{ report_formats }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, cleanup, find]
-
-- name: "(transfer_to_repository) Create combined list of all timestamped directories"
-  set_fact:
-    all_timestamped_dirs_cleanup: "{{ timestamped_dirs_cleanup.results | map(attribute='files') | flatten | map(attribute='path') | list }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, cleanup, list]
-
-- name: "(transfer_to_repository) Sort directories by timestamp (newest first)"
-  set_fact:
-    sorted_timestamped_dirs_cleanup: "{{ all_timestamped_dirs_cleanup | map('basename') | unique | sort(reverse=true) | list }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, cleanup, sort]
-
-- name: "(transfer_to_repository) Identify directories to remove (keep only recent ones)"
-  set_fact:
-    dirs_to_remove_cleanup: "{{ sorted_timestamped_dirs_cleanup[max_archived_reports | default(50):] }}"
-  when: sorted_timestamped_dirs_cleanup | length > (max_archived_reports | default(50))
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, cleanup, identify]
-
-- name: "(transfer_to_repository) Remove old timestamped directories"
-  file:
-    path: "{{ repository_base_path }}/{{ item[0] }}/{{ item[1] }}"
-    state: absent
-  loop: "{{ report_formats | product(dirs_to_remove_cleanup | default([])) | list }}"
-  when: dirs_to_remove_cleanup is defined and dirs_to_remove_cleanup | length > 0
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, cleanup, remove]
-
-- name: "(transfer_to_repository) Remove very old reports based on retention policy"
-  find:
-    paths: "{{ repository_base_path }}/{{ item }}"
-    file_type: directory
-    age: "{{ repository_retention_days }}d"
-    patterns: "[0-9]*"
-    excludes: 
-      - "archive"
-      - "latest"
-  register: old_timestamped_dirs_cleanup
-  loop: "{{ report_formats }}"
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  run_once: true
-  tags: [transfer, cleanup, retention]
-
-- name: "(transfer_to_repository) Remove directories older than retention policy"
-  file:
-    path: "{{ item.1.path }}"
-    state: absent
-  loop: "{{ old_timestamped_dirs_cleanup.results | subelements('files', skip_missing=True) }}"
-  when: item.1.path is defined
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, cleanup, retention_remove]
-
-- name: "(transfer_to_repository) Log cleanup activity"
-  lineinfile:
-    path: "{{ repository_base_path }}/logs/cleanup.log"
-    line: "{{ ansible_date_time.iso8601 }} - Cleanup: {{ dirs_to_remove_cleanup | default([]) | length + (old_timestamped_dirs_cleanup.results | map(attribute='files') | flatten | length) }} directories removed - Retention: {{ repository_retention_days }} days - Max archives: {{ max_archived_reports | default(50) }}"
-    create: true
-    owner: "{{ current_webserver_user | default('www-data') }}"
-    group: "{{ current_webserver_group | default('www-data') }}"
-    mode: '0644'
-  delegate_to: "{{ groups['repository_managers'][0] }}"
-  become: true
-  run_once: true
-  tags: [transfer, cleanup, logging]
-
-- name: "(transfer_to_repository) Cleanup control node temporary files"
-  file:
-    path: "{{ control_node_reports_path }}"
-    state: absent
-  delegate_to: localhost
-  run_once: true
-  when: cleanup_control_node_files | default(true) | bool
-  tags: [transfer, cleanup]
-
-- name: "(transfer_to_repository) Display transfer summary"
-  debug:
-    msg: |
-      Repository Transfer Summary:
-      - Repository server: {{ groups['repository_managers'][0] }}
-      - Transfer timestamp: {{ transfer_timestamp }}
-      - Base path: {{ repository_base_path }}
-      - Formats transferred: {{ report_formats | join(', ') }}
-      - Execution ID: {{ execution_id }}
-      - Transfer time: {{ ansible_date_time.iso8601 }}
-      - Timestamped directories created: {{ report_formats | map('regex_replace', '^(.*)$', repository_base_path + '/\\1/' + transfer_timestamp) | list | join(', ') }}
-      - Latest symlinks updated: Yes
-      - Control node cleanup: {{ cleanup_control_node_files | default(true) }}
-      - Cleanup summary: {{ dirs_to_remove_cleanup | default([]) | length }} old directories removed
-  run_once: true
-  tags: [transfer, info]
