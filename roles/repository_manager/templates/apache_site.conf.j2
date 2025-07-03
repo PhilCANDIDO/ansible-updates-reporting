@@ -8,9 +8,6 @@
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-XSS-Protection "1; mode=block"
     
-    # Disable server signature
-    ServerTokens {{ 'Off' if not webserver_security.server_tokens else 'On' }}
-    
     # Main directory configuration
     <Directory {{ repository_base_path }}>
         Options Indexes FollowSymLinks

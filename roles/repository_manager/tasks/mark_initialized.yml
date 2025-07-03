@@ -8,9 +8,10 @@
       Webserver type: {{ webserver_type }}
       Report formats: {{ report_formats | join(', ') }}
     dest: "{{ repository_base_path }}/.initialized"
-    owner: "{{ webserver_user | default('www-data') }}"
-    group: "{{ webserver_group | default('www-data') }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
+  become: true
   tags: [initialization, marker]
 
 - name: "(mark_initialized) Display initialization completion"

@@ -1,47 +1,60 @@
 ---
+- name: "(setup_directories) Ensure base directory parent exists"
+  file:
+    path: "{{ repository_base_path | dirname }}"
+    state: directory
+    mode: '0755'
+  become: true
+  tags: [setup, directories]
+
 - name: "(setup_directories) Create base repository directory"
   file:
     path: "{{ repository_base_path }}"
     state: directory
-    owner: "{{ current_webserver_user }}"
-    group: "{{ current_webserver_group }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0755'
+  become: true
   tags: [setup, directories]
 
 - name: "(setup_directories) Create report format subdirectories"
   file:
     path: "{{ repository_base_path }}/{{ item }}"
     state: directory
-    owner: "{{ current_webserver_user }}"
-    group: "{{ current_webserver_group }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0755'
   loop: "{{ report_formats }}"
+  become: true
   tags: [setup, directories]
 
 - name: "(setup_directories) Create current and archive directories"
   file:
     path: "{{ repository_base_path }}/{{ item[1] }}/{{ item[0] }}"
     state: directory
-    owner: "{{ current_webserver_user }}"
-    group: "{{ current_webserver_group }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0755'
   loop: "{{ report_formats | product(['current', 'archive']) | list }}"
+  become: true
   tags: [setup, directories]
 
 - name: "(setup_directories) Create log directory for repository"
   file:
     path: "{{ repository_base_path }}/logs"
     state: directory
-    owner: "{{ current_webserver_user }}"
-    group: "{{ current_webserver_group }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0755'
+  become: true
   tags: [setup, directories]
 
 - name: "(setup_directories) Create index.html for repository root"
   template:
     src: index.html.j2
     dest: "{{ repository_base_path }}/index.html"
-    owner: "{{ current_webserver_user }}"
-    group: "{{ current_webserver_group }}"
+    owner: "{{ current_webserver_user | default('www-data') }}"
+    group: "{{ current_webserver_group | default('www-data') }}"
     mode: '0644'
+  become: true
   tags: [setup, directories, index]

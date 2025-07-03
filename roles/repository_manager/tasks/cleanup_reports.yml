@@ -18,6 +18,7 @@
     mode: '0755'
   loop: "{{ report_formats }}"
   when: old_reports.results | selectattr('files', 'defined') | selectattr('files', '!=', []) | list | length > 0
+  become: true
   tags: [cleanup, archive, directories]
 
 - name: "(cleanup_reports) Move old reports to archive"

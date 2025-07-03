@@ -3,6 +3,7 @@
   package:
     name: "{{ current_webserver_packages }}"
     state: present
+  become: true
   tags: [setup, webserver, packages]
 
 - name: "(configure_webserver) Install Python dependencies for Excel generation"
@@ -11,6 +12,7 @@
       - openpyxl
       - pandas
     state: present
+  become: true
   tags: [setup, packages, python]
 
 - name: "(configure_webserver) Enable Apache modules (Debian/Ubuntu)"
@@ -21,6 +23,7 @@
   when: 
     - webserver_type == 'apache'
     - ansible_os_family == 'Debian'
+  become: true
   notify: "restart {{ webserver_type }}"
   tags: [setup, webserver, modules]
 
@@ -30,6 +33,7 @@
   when: 
     - webserver_type == 'apache'
     - ansible_os_family == 'Suse'
+  become: true
   notify: "restart {{ webserver_type }}"
   changed_when: false
   tags: [setup, webserver, modules]
@@ -42,6 +46,7 @@
     owner: root
     group: root
     mode: '0644'
+  become: true
   notify: "restart {{ webserver_type }}"
   tags: [setup, webserver, config]
 
@@ -50,6 +55,7 @@
   when: 
     - webserver_type == 'apache'
     - ansible_os_family == 'Debian'
+  become: true
   notify: "restart {{ webserver_type }}"
   changed_when: false
   tags: [setup, webserver, enable_site]
@@ -59,6 +65,7 @@
   when: 
     - webserver_type == 'apache'
     - ansible_os_family == 'Suse'
+  become: true
   notify: "restart {{ webserver_type }}"
   changed_when: false
   tags: [setup, webserver, enable_site]
@@ -71,6 +78,7 @@
   when: 
     - webserver_type == 'nginx'
     - ansible_os_family == 'Debian'
+  become: true
   notify: "restart {{ webserver_type }}"
   tags: [setup, webserver, enable_site]
 
@@ -85,6 +93,7 @@
     - webserver_type == 'apache'
     - configure_selinux | bool
     - ansible_selinux.status == 'enabled'
+  become: true
   tags: [setup, webserver, selinux]
 
 - name: "(configure_webserver) Set SELinux context for repository directory (RedHat family)"
@@ -97,6 +106,7 @@
     - webserver_type == 'apache'
     - configure_selinux | bool
     - ansible_selinux.status == 'enabled'
+  become: true
   tags: [setup, webserver, selinux]
 
 - name: "(configure_webserver) Apply SELinux context to repository directory (RedHat family)"
@@ -106,6 +116,7 @@
     - webserver_type == 'apache'
     - configure_selinux | bool
     - ansible_selinux.status == 'enabled'
+  become: true
   changed_when: false
   tags: [setup, webserver, selinux]
 
@@ -118,6 +129,7 @@
   when: 
     - ansible_os_family == 'RedHat'
     - configure_firewall | bool
+  become: true
   tags: [setup, webserver, firewall]
 
 - name: "(configure_webserver) Configure firewall - ufw (Debian family)"
@@ -129,6 +141,7 @@
   when: 
     - ansible_os_family == 'Debian'
     - configure_firewall | bool
+  become: true
   tags: [setup, webserver, firewall]
 
 - name: "(configure_webserver) Ensure webserver is started and enabled"
@@ -136,11 +149,13 @@
     name: "{{ current_webserver_service }}"
     state: started
     enabled: true
+  become: true
   tags: [setup, webserver, service]
 
 - name: "(configure_webserver) Verify webserver configuration"
   command: "{{ 'nginx -t' if webserver_type == 'nginx' else 'httpd -t' if ansible_os_family == 'RedHat' else 'apache2ctl -t' }}"
   register: webserver_config_test
+  become: true
   changed_when: false
   failed_when: webserver_config_test.rc != 0
   tags: [setup, webserver, validation]
