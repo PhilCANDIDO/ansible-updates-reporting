@@ -1,44 +1,104 @@
 ---
+# roles/updates_collector/tasks/collect_debian_updates_improved.yml
 - name: "(collect_debian_updates) Update package cache"
   apt:
     update_cache: true
     cache_valid_time: 3600
   tags: [debian, cache_update]
 
-- name: "(collect_debian_updates) Get list of upgradable packages"
+- name: "(collect_debian_updates) Get list of upgradable packages (method 1: apt list)"
   shell: |
     apt list --upgradable 2>/dev/null | grep -v '^Listing' | grep -v '^WARNING'
   register: debian_upgradable_raw
   changed_when: false
   failed_when: false
-  tags: [debian, package_list]
+  tags: [debian, package_list, method1]
 
-- name: "(collect_debian_updates) Parse upgradable packages"
-  set_fact:
-    debian_updates: "{{ debian_upgradable_raw.stdout_lines | default([]) | debian_parse_updates }}"
-  tags: [debian, parsing]
+- name: "(collect_debian_updates) Get list of upgradable packages (method 2: apt-get simulation)"
+  shell: |
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -s 2>/dev/null | grep "^Inst" | sed 's/^Inst //'
+  register: debian_upgradable_sim
+  changed_when: false
+  failed_when: false
+  tags: [debian, package_list, method2]
 
-- name: "(collect_debian_updates) Count security updates from parsed packages"
-  set_fact:
-    debian_security_updates_count: "{{ debian_updates | selectattr('is_security', 'equalto', true) | list | length }}"
-  tags: [debian, security_count]
+- name: "(collect_debian_updates) Check for security updates using unattended-upgrades info"
+  shell: |
+    if command -v unattended-upgrade >/dev/null 2>&1; then
+      unattended-upgrade --dry-run 2>/dev/null | grep "^Get:" || echo ""
+    else
+      echo ""
+    fi
+  register: debian_security_check
+  changed_when: false
+  failed_when: false
+  tags: [debian, security_check]
 
-- name: "(collect_debian_updates) Debug security information"
+- name: "(collect_debian_updates) Get security updates using apt-get with security repository"
+  shell: |
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -s 2>/dev/null | grep "^Inst" | grep -E "(security|security-updates)" || echo ""
+  register: debian_security_raw
+  changed_when: false
+  failed_when: false
+  tags: [debian, security_direct]
+
+- name: "(collect_debian_updates) Debug raw output"
   debug:
     msg: |
-      Security Updates Information:
-      - Total packages: {{ debian_updates | length }}
-      - Security packages found: {{ debian_security_updates_count }}
-      - Security packages list: {{ debian_updates | selectattr('is_security', 'equalto', true) | map(attribute='name') | list }}
-  when: debian_security_updates_count | int > 0
+      Raw outputs for debugging:
+      Method 1 (apt list): {{ debian_upgradable_raw.stdout_lines | length }} lines
+      Method 2 (apt-get sim): {{ debian_upgradable_sim.stdout_lines | length }} lines
+      Security check: {{ debian_security_check.stdout_lines | length }} lines
+      Security raw: {{ debian_security_raw.stdout_lines | length }} lines
+      
+      First 3 lines from apt list:
+      {% for line in debian_upgradable_raw.stdout_lines[:3] %}
+      - {{ line }}
+      {% endfor %}
   tags: [debian, debug]
+
+- name: "(collect_debian_updates) Parse upgradable packages using improved logic"
+  set_fact:
+    debian_updates: "{{ debian_upgradable_raw.stdout_lines | default([]) | debian_parse_updates_improved }}"
+  tags: [debian, parsing]
+
+- name: "(collect_debian_updates) Fallback: Parse using apt-get simulation if apt list failed"
+  set_fact:
+    debian_updates: "{{ debian_upgradable_sim.stdout_lines | default([]) | debian_parse_apt_get_sim }}"
+  when: debian_updates | length == 0 and debian_upgradable_sim.stdout_lines | length > 0
+  tags: [debian, parsing, fallback]
+
+- name: "(collect_debian_updates) Enhanced security detection"
+  set_fact:
+    debian_updates_with_security: "{{ debian_updates | debian_enhance_security_detection(debian_security_raw.stdout_lines | default([])) }}"
+  tags: [debian, security_enhancement]
+
+- name: "(collect_debian_updates) Count security updates"
+  set_fact:
+    debian_security_updates_count: "{{ debian_updates_with_security | selectattr('is_security', 'equalto', true) | list | length }}"
+  tags: [debian, security_count]
+
+- name: "(collect_debian_updates) Display detailed security information"
+  debug:
+    msg: |
+      Security Updates Detailed Information:
+      - Total packages available for update: {{ debian_updates_with_security | length }}
+      - Security packages found: {{ debian_security_updates_count }}
+      - Security packages list: {{ debian_updates_with_security | selectattr('is_security', 'equalto', true) | map(attribute='name') | list }}
+      - Packages requiring reboot: {{ debian_updates_with_security | selectattr('requires_reboot', 'equalto', true) | map(attribute='name') | list }}
+  when: debian_updates_with_security | length > 0
+  tags: [debian, debug, detailed]
 
 - name: "(collect_debian_updates) Set collected updates for this host"
   set_fact:
     collected_updates:
-      total_count: "{{ debian_updates | length }}"
+      total_count: "{{ debian_updates_with_security | length }}"
       security_count: "{{ debian_security_updates_count }}"
-      packages: "{{ debian_updates }}"
+      packages: "{{ debian_updates_with_security }}"
       collection_method: "apt"
       collection_timestamp: "{{ ansible_date_time.iso8601 }}"
+      debug_info:
+        raw_lines_processed: "{{ debian_upgradable_raw.stdout_lines | length }}"
+        fallback_used: "{{ debian_upgradable_raw.stdout_lines | length == 0 }}"
+        security_sources: "{{ debian_security_raw.stdout_lines | length }}"
   tags: [debian, results]

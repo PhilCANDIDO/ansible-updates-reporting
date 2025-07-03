@@ -1,50 +1,116 @@
 #!/usr/bin/env python3
 
 def debian_parse_updates(package_lines):
-    """Parse Debian/Ubuntu package update lines - Version corrigée"""
+    """Parse Debian/Ubuntu package update lines - Version corrigée et renforcée"""
     packages = []
     
     for line in package_lines:
+        line = line.strip()
+        if not line or line.startswith('Listing') or line.startswith('WARNING'):
+            continue
+            
+        # Format attendu: package_name/repository version [upgradable from: current_version]
         if '/' in line and '[upgradable from:' in line:
-            parts = line.split('/')
-            if len(parts) >= 2:
+            try:
+                # Séparer le nom du package et le reste
+                parts = line.split('/', 1)
+                if len(parts) < 2:
+                    continue
+                    
                 package_name = parts[0].strip()
-                rest = parts[1]
+                rest = parts[1].strip()
                 
-                # Extract version info
-                version_new = rest.split(' ')[0] if ' ' in rest else 'unknown'
+                # Extraire la version disponible (premier élément après le repository)
+                rest_parts = rest.split(' ')
+                if len(rest_parts) < 1:
+                    continue
+                    
+                # Le repository peut contenir des espaces, donc on cherche la version
+                version_new = 'unknown'
+                repository = 'unknown'
                 
-                # Extract current version
+                # Chercher la version dans les premiers éléments
+                for i, part in enumerate(rest_parts):
+                    if part and not part.startswith('['):
+                        if i == 0:
+                            repository = part
+                        elif version_new == 'unknown':
+                            version_new = part
+                            break
+                
+                # Extraire la version actuelle
                 version_current = 'unknown'
-                if '[upgradable from:' in rest:
-                    version_current = rest.split('[upgradable from: ')[1].split(']')[0] if ']' in rest else 'unknown'
+                if '[upgradable from:' in line:
+                    current_part = line.split('[upgradable from: ')[1]
+                    if ']' in current_part:
+                        version_current = current_part.split(']')[0].strip()
                 
-                # Amélioration de la détection des mises à jour de sécurité
-                is_security = (
-                    'security' in line.lower() or 
-                    'security-updates' in line.lower() or
-                    '-security' in line.lower() or
-                    '/security' in line.lower() or
-                    'stable-security' in line.lower() or
-                    'focal-security' in line.lower() or
-                    'jammy-security' in line.lower() or
-                    'bookworm-security' in line.lower()
+                # Détection renforcée des mises à jour de sécurité
+                line_lower = line.lower()
+                repository_lower = repository.lower()
+                
+                is_security = any([
+                    'security' in line_lower,
+                    'security-updates' in line_lower,
+                    '-security' in repository_lower,
+                    '/security' in repository_lower,
+                    'stable-security' in repository_lower,
+                    'oldstable-security' in repository_lower,
+                    'testing-security' in repository_lower,
+                    # Ubuntu specific
+                    'focal-security' in repository_lower,
+                    'jammy-security' in repository_lower,
+                    'kinetic-security' in repository_lower,
+                    'lunar-security' in repository_lower,
+                    'mantic-security' in repository_lower,
+                    'noble-security' in repository_lower,
+                    # Debian specific
+                    'bookworm-security' in repository_lower,
+                    'bullseye-security' in repository_lower,
+                    'buster-security' in repository_lower,
+                ])
+                
+                # Détection des paquets nécessitant un redémarrage
+                kernel_packages = [
+                    'linux-image', 'linux-headers', 'linux-modules',
+                    'systemd', 'init', 'udev', 'libc6', 'libssl'
+                ]
+                
+                requires_reboot = any(
+                    kernel_pkg in package_name.lower() 
+                    for kernel_pkg in kernel_packages
                 )
                 
-                packages.append({
+                # Extraire l'architecture si présente
+                architecture = 'unknown'
+                if ' ' in rest:
+                    for part in rest_parts:
+                        if part in ['amd64', 'i386', 'arm64', 'armhf', 'all']:
+                            architecture = part
+                            break
+                
+                package = {
                     'name': package_name,
                     'current_version': version_current,
                     'available_version': version_new,
                     'is_security': is_security,
-                    'architecture': rest.split(' ')[1] if len(rest.split(' ')) > 1 else 'unknown',
-                    'requires_reboot': 'kernel' in package_name.lower() or 'linux-image' in package_name.lower(),
-                    'raw_line': line  # Ajout pour debugging
-                })
+                    'repository': repository,
+                    'architecture': architecture,
+                    'requires_reboot': requires_reboot,
+                    'raw_line': line  # Pour debugging
+                }
+                
+                packages.append(package)
+                
+            except Exception as e:
+                # En cas d'erreur de parsing, on continue avec le package suivant
+                # mais on peut logger l'erreur pour debugging
+                continue
     
     return packages
 
 def redhat_parse_updates(package_lines):
-    """Parse RedHat/CentOS/Rocky/Alma package update lines - Version corrigée"""
+    """Parse RedHat/CentOS/Rocky/Alma package update lines - Inchangé"""
     packages = []
     for line in package_lines:
         if line.strip() and not line.startswith('Last metadata') and not line.startswith('Loaded plugins'):
@@ -54,7 +120,6 @@ def redhat_parse_updates(package_lines):
                 available_version = parts[1]
                 repository = parts[2] if len(parts) > 2 else 'unknown'
                 
-                # Amélioration de la détection des mises à jour de sécurité
                 is_security = (
                     'security' in repository.lower() or 
                     'updates-security' in repository.lower() or
@@ -70,13 +135,13 @@ def redhat_parse_updates(package_lines):
                     'repository': repository,
                     'architecture': package_name.split('.')[-1] if '.' in package_name else 'unknown',
                     'requires_reboot': 'kernel' in package_name.lower(),
-                    'raw_line': line  # Ajout pour debugging
+                    'raw_line': line
                 })
     
     return packages
 
 def suse_parse_updates(package_lines):
-    """Parse SUSE/OpenSUSE package update lines"""
+    """Parse SUSE/OpenSUSE package update lines - Inchangé"""
     packages = []
     for line in package_lines:
         if line.strip():
@@ -86,7 +151,6 @@ def suse_parse_updates(package_lines):
                 current_version = parts[1] if len(parts) > 1 else 'installed'
                 available_version = parts[2] if len(parts) > 2 else 'unknown'
                 
-                # Determine if it's a security update (basic heuristic)
                 is_security = 'security' in line.lower() or 'patch' in line.lower()
                 
                 packages.append({
@@ -101,7 +165,7 @@ def suse_parse_updates(package_lines):
     return packages
 
 def extract_host_summary(host_data):
-    """Extract summary information for a host"""
+    """Extract summary information for a host - Inchangé"""
     return {
         'hostname': host_data.get('metadata', {}).get('hostname', 'unknown'),
         'fqdn': host_data.get('metadata', {}).get('fqdn', 'N/A'),
