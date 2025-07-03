@@ -17,27 +17,29 @@
     {
       "timestamp": "{{ timestamp }}",
       "url": "/{{ format_type }}/{{ timestamp }}/",
-      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}",
-      "iso_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T(\\d{2})(\\d{2})(\\d{2})', '\\1-\\2-\\3T\\4:\\5:\\6Z') }}",
+      "formatted_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T?(\\d{2})(\\d{2})(\\d{2})', '\\3/\\2/\\1 \\4:\\5:\\6') }}",
+      "iso_date": "{{ timestamp | regex_replace('(\\d{4})(\\d{2})(\\d{2})T?(\\d{2})(\\d{2})(\\d{2})', '\\1-\\2-\\3T\\4:\\5:\\6Z') }}",
       "metadata": {
         "execution_id": "{{ timestamp }}",
         {% if format_type == 'json' %}
         "summary_url": "/{{ format_type }}/{{ timestamp }}/consolidated_report_{{ timestamp }}.json",
+        "index_url": "/{{ format_type }}/{{ timestamp }}/index.json"
         {% elif format_type == 'html' %}
         "consolidated_url": "/{{ format_type }}/{{ timestamp }}/consolidated_report_{{ timestamp }}.html",
         "summary_url": "/{{ format_type }}/{{ timestamp }}/email_summary_{{ timestamp }}.html",
+        "index_url": "/{{ format_type }}/{{ timestamp }}/index.html"
         {% elif format_type == 'excel' %}
         "consolidated_url": "/{{ format_type }}/{{ timestamp }}/consolidated_report_{{ timestamp }}.xlsx",
+        "csv_summary_url": "/{{ format_type }}/{{ timestamp }}/consolidated_summary_{{ timestamp }}.csv"
         {% endif %}
-        "index_url": "/{{ format_type }}/{{ timestamp }}/index.{{ 'json' if format_type == 'json' else 'html' }}"
       }
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   ],
   "statistics": {
     "total_archives": {{ format_directories | length }},
-    "latest_timestamp": "{{ format_directories | first | default('N/A') }}",
-    "oldest_timestamp": "{{ format_directories | last | default('N/A') }}",
+    "latest_timestamp": {{ ("\"" + format_directories | first + "\"") if format_directories | length > 0 else "null" }},
+    "oldest_timestamp": {{ ("\"" + format_directories | last + "\"") if format_directories | length > 0 else "null" }},
     "retention_policy": {
       "max_archives": {{ max_archived_reports | default(50) }},
       "retention_days": {{ repository_retention_days | default(30) }}
@@ -45,18 +47,20 @@
   },
   "quick_links": {
     "latest_reports": "/{{ format_type }}/latest/",
+    {% if format_directories | length > 0 %}
+    {% set latest_timestamp = format_directories | first %}
     {% if format_type == 'html' %}
-    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.html",
-    "latest_summary": "/{{ format_type }}/latest/email_summary_{{ format_directories | first | default('20250703T190650') }}.html",
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.html",
+    "latest_summary": "/{{ format_type }}/latest/email_summary_{{ latest_timestamp }}.html",
     "latest_index": "/{{ format_type }}/latest/index.html"
     {% elif format_type == 'json' %}
-    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.json",
-    "latest_index": "/{{ format_type }}/latest/index.json",
-    "latest_errors": "/{{ format_type }}/latest/errors_{{ format_directories | first | default('20250703T190650') }}.json"
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.json",
+    "latest_index": "/{{ format_type }}/latest/index.json"
     {% elif format_type == 'excel' %}
-    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.xlsx",
-    "latest_csv_summary": "/{{ format_type }}/latest/consolidated_summary_{{ format_directories | first | default('20250703T190650') }}.csv",
-    "latest_csv_packages": "/{{ format_type }}/latest/consolidated_packages_{{ format_directories | first | default('20250703T190650') }}.csv"
+    "latest_consolidated": "/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.xlsx"
+    {% endif %}
+    {% else %}
+    "note": "No reports available yet"
     {% endif %}
   },
   "navigation": {
@@ -72,16 +76,17 @@
   },
   "usage_examples": {
     "browse_latest": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/",
-    "get_api_info": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json",
+    "get_api_info": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json"
+    {% if format_directories | length > 0 %}
+    {% set latest_timestamp = format_directories | first %}
     {% if format_type == 'json' %}
-    "get_latest_report": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.json | jq .",
+    ,"get_latest_report": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.json | jq .",
     "list_timestamps": "curl -X GET http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/api.json | jq '.available_timestamps[].timestamp'"
     {% elif format_type == 'html' %}
-    "view_latest_report": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.html",
-    "view_email_summary": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/email_summary_{{ format_directories | first | default('20250703T190650') }}.html"
+    ,"view_latest_report": "open http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.html"
     {% elif format_type == 'excel' %}
-    "download_latest": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ format_directories | first | default('20250703T190650') }}.xlsx",
-    "download_csv_fallback": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_summary_{{ format_directories | first | default('20250703T190650') }}.csv"
+    ,"download_latest": "wget http://{{ ansible_fqdn | default(ansible_hostname) }}/{{ format_type }}/latest/consolidated_report_{{ latest_timestamp }}.xlsx"
+    {% endif %}
     {% endif %}
   },
   "repository_info": {

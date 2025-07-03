@@ -26,6 +26,10 @@
   include_tasks: generate_indexes.yml
   tags: [indexes, generation]
 
+- name: "(repository_manager) Include JSON validation tasks"
+  include_tasks: validate_json_apis.yml
+  tags: [validation, json]
+
 - name: "(repository_manager) Include cleanup tasks"
   include_tasks: cleanup_reports.yml
   tags: [cleanup, maintenance]

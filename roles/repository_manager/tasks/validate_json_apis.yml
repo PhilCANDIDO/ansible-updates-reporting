@@ -1,0 +1,82 @@
+---
+- name: "(validate_json_apis) Check JSON syntax for main API"
+  command: python3 -m json.tool {{ repository_base_path }}/api.json
+  register: main_api_validation
+  failed_when: main_api_validation.rc != 0
+  changed_when: false
+  become: true
+  tags: [validation, json, main_api]
+
+- name: "(validate_json_apis) Check JSON syntax for format APIs"
+  command: python3 -m json.tool {{ repository_base_path }}/{{ item }}/api.json
+  register: format_api_validation
+  failed_when: format_api_validation.rc != 0
+  changed_when: false
+  loop: "{{ report_formats }}"
+  become: true
+  tags: [validation, json, format_apis]
+
+- name: "(validate_json_apis) Display validation results"
+  debug:
+    msg: |
+      JSON API Validation Results:
+      - Main API ({{ repository_base_path }}/api.json): {{ 'VALID' if main_api_validation.rc == 0 else 'INVALID' }}
+      {% for result in format_api_validation.results %}
+      - {{ result.item }} API: {{ 'VALID' if result.rc == 0 else 'INVALID' }}
+      {% endfor %}
+  tags: [validation, json, results]
+
+- name: "(validate_json_apis) Backup and fix invalid JSON files"
+  block:
+    - name: "Create backup of invalid main API"
+      copy:
+        src: "{{ repository_base_path }}/api.json"
+        dest: "{{ repository_base_path }}/api.json.backup.{{ ansible_date_time.epoch }}"
+        remote_src: true
+      when: main_api_validation.rc != 0
+      become: true
+
+    - name: "Create backup of invalid format APIs"
+      copy:
+        src: "{{ repository_base_path }}/{{ item.item }}/api.json"
+        dest: "{{ repository_base_path }}/{{ item.item }}/api.json.backup.{{ ansible_date_time.epoch }}"
+        remote_src: true
+      loop: "{{ format_api_validation.results }}"
+      when: item.rc != 0
+      become: true
+
+    - name: "Regenerate invalid APIs"
+      include_tasks: generate_indexes.yml
+      when: 
+        - main_api_validation.rc != 0 or 
+          (format_api_validation.results | selectattr('rc', 'ne', 0) | list | length > 0)
+
+  rescue:
+    - name: "Log JSON validation failure"
+      debug:
+        msg: "JSON validation and repair failed. Manual intervention required."
+      
+    - name: "Create error report"
+      copy:
+        content: |
+          JSON API Validation Failed at {{ ansible_date_time.iso8601 }}
+          
+          Main API Status: {{ 'VALID' if main_api_validation.rc == 0 else 'INVALID' }}
+          {% if main_api_validation.rc != 0 %}
+          Main API Error: {{ main_api_validation.stderr }}
+          {% endif %}
+          
+          Format API Status:
+          {% for result in format_api_validation.results %}
+          - {{ result.item }}: {{ 'VALID' if result.rc == 0 else 'INVALID' }}
+          {% if result.rc != 0 %}
+            Error: {{ result.stderr }}
+          {% endif %}
+          {% endfor %}
+        dest: "{{ repository_base_path }}/logs/json_validation_error_{{ ansible_date_time.epoch }}.log"
+        owner: "{{ current_webserver_user | default('www-data') }}"
+        group: "{{ current_webserver_group | default('www-data') }}"
+        mode: '0644'
+      become: true
+
+  tags: [validation, json, fix]

@@ -309,17 +309,43 @@
                     this.error = null;
                     
                     try {
+                        console.log('Fetching API data for {{ format_type }}...');
+                        
                         // Récupérer les données depuis l'API du format
                         const response = await fetch('/{{ format_type }}/api.json');
+                        console.log('API Response status:', response.status);
+                        
                         if (!response.ok) {
-                            throw new Error(`Failed to fetch API data: ${response.status}`);
+                            throw new Error(`Failed to fetch API data: ${response.status} - ${response.statusText}`);
                         }
                         
-                        const apiData = await response.json();
+                        const responseText = await response.text();
+                        console.log('Raw API response:', responseText.substring(0, 500) + '...');
+                        
+                        let apiData;
+                        try {
+                            apiData = JSON.parse(responseText);
+                            console.log('Parsed API data:', apiData);
+                        } catch (jsonError) {
+                            console.error('JSON Parse error:', jsonError);
+                            console.error('Response text:', responseText);
+                            throw new Error(`Invalid JSON response: ${jsonError.message}`);
+                        }
+                        
+                        if (!apiData.available_timestamps || !Array.isArray(apiData.available_timestamps)) {
+                            console.warn('No available_timestamps found in API response');
+                            this.reports = [];
+                            this.filteredReports = [];
+                            return;
+                        }
+                        
+                        console.log('Available timestamps:', apiData.available_timestamps);
                         
                         // Transformer les timestamps en objets avec métadonnées enrichies
                         this.reports = await Promise.all(
                             apiData.available_timestamps.map(async (item) => {
+                                console.log('Processing timestamp:', item.timestamp);
+                                
                                 let summary = {
                                     total_hosts: 0,
                                     total_updates: 0,
@@ -330,14 +356,36 @@
                                 // Essayer de récupérer les métadonnées du rapport consolidé
                                 try {
                                     {% if format_type == 'json' %}
-                                    const reportResponse = await fetch(`/${format_type}/${item.timestamp}/consolidated_report_${item.timestamp}.json`);
+                                    const reportUrl = `/{{ format_type }}/${item.timestamp}/consolidated_report_${item.timestamp}.json`;
+                                    console.log('Fetching report metadata from:', reportUrl);
+                                    
+                                    const reportResponse = await fetch(reportUrl);
                                     if (reportResponse.ok) {
                                         const reportData = await reportResponse.json();
+                                        console.log('Report metadata loaded:', reportData.summary);
+                                        
                                         summary = {
                                             total_hosts: reportData.summary?.total_hosts || 0,
                                             total_updates: reportData.summary?.total_updates || 0,
                                             security_updates: reportData.summary?.total_security_updates || 0,
                                             critical_hosts: reportData.critical_hosts?.length || 0
+                                        };
+                                    } else {
+                                        console.warn(`Could not fetch report metadata (${reportResponse.status}):`, reportUrl);
+                                    }
+                                    {% else %}
+                                    // Pour HTML et Excel, essayer de récupérer depuis l'index JSON s'il existe
+                                    const indexUrl = `/json/${item.timestamp}/consolidated_report_${item.timestamp}.json`;
+                                    console.log('Trying to fetch metadata from JSON counterpart:', indexUrl);
+                                    
+                                    const indexResponse = await fetch(indexUrl);
+                                    if (indexResponse.ok) {
+                                        const indexData = await indexResponse.json();
+                                        summary = {
+                                            total_hosts: indexData.summary?.total_hosts || 0,
+                                            total_updates: indexData.summary?.total_updates || 0,
+                                            security_updates: indexData.summary?.total_security_updates || 0,
+                                            critical_hosts: indexData.critical_hosts?.length || 0
                                         };
                                     }
                                     {% endif %}
@@ -354,6 +402,7 @@
                             })
                         );
                         
+                        console.log('Final reports data:', this.reports);
                         this.filteredReports = [...this.reports];
                         
                     } catch (err) {
@@ -384,27 +433,32 @@
 
                 formatDate(timestamp) {
                     // Format: YYYYMMDDThhmmss → readable date
-                    if (timestamp.includes('T')) {
-                        const [date, time] = timestamp.split('T');
-                        const year = date.substring(0, 4);
-                        const month = date.substring(4, 6);
-                        const day = date.substring(6, 8);
-                        const hour = time.substring(0, 2);
-                        const minute = time.substring(2, 4);
-                        const second = time.substring(4, 6);
+                    try {
+                        if (timestamp.includes('T')) {
+                            const [date, time] = timestamp.split('T');
+                            const year = date.substring(0, 4);
+                            const month = date.substring(4, 6);
+                            const day = date.substring(6, 8);
+                            const hour = time.substring(0, 2);
+                            const minute = time.substring(2, 4);
+                            const second = time.substring(4, 6);
+                            
+                            return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+                        }
+                        
+                        // Fallback pour l'ancien format
+                        const year = timestamp.substring(0, 4);
+                        const month = timestamp.substring(4, 6);
+                        const day = timestamp.substring(6, 8);
+                        const hour = timestamp.substring(8, 10);
+                        const minute = timestamp.substring(10, 12);
+                        const second = timestamp.substring(12, 14);
                         
                         return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+                    } catch (e) {
+                        console.warn('Error formatting date:', timestamp, e);
+                        return timestamp;
                     }
-                    
-                    // Fallback pour l'ancien format
-                    const year = timestamp.substring(0, 4);
-                    const month = timestamp.substring(4, 6);
-                    const day = timestamp.substring(6, 8);
-                    const hour = timestamp.substring(8, 10);
-                    const minute = timestamp.substring(10, 12);
-                    const second = timestamp.substring(12, 14);
-                    
-                    return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
                 },
 
                 openReport(report) {
