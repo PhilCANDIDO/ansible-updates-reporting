@@ -69,3 +69,6 @@ galaxy_roles/
 local/
 private/
 secrets/
+
+CLAUDE.md
+.claude/
