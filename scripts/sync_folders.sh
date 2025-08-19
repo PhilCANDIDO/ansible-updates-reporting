@@ -9,14 +9,17 @@
 # - 1.2.0: Removed default SRC_DIR/DST_DIR; both are now mandatory.
 # - 1.3.0: Added --no-log to print to stdout only (no log file creation).
 # - 1.4.0: Check rsync is installed; explicit check/report of rsync exit status.
+# - 1.5.0: Added --dry-run to preview changes without applying them.
+# - 1.6.0: If .sync_exclude does not exist, continue sync without error.
 #
 
 # Script version
-VERSION="1.4.0"
+VERSION="1.6.0"
 
 # Log file (same basename as script, .log extension)
 LOG_FILE="$(basename "$0" .sh).log"
 NO_LOG=false
+DRY_RUN=false
 
 # Mandatory parameters (filled by CLI)
 SRC_DIR=""
@@ -24,7 +27,6 @@ DST_DIR=""
 
 # --- Helpers ---------------------------------------------------------------
 
-# Print help text
 show_help() {
     cat <<EOF
 Usage: $0 --src-folder <path> --dst-folder <path> [OPTIONS]
@@ -37,18 +39,18 @@ Options:
       --src-folder <path>    Source folder (mandatory)
       --dst-folder <path>    Destination folder (mandatory)
       --no-log               Do not write a log file; print to stdout only
+      --dry-run              Show what would be done without making changes
 
 Notes:
 - Entries in '.sync_exclude' are relative to the source root.
 - The '.git' directory is always excluded from synchronization.
+- If '.sync_exclude' does not exist, sync continues normally.
 
 Version: ${VERSION}
 EOF
 }
 
-# Timestamped logger: [YYYYMMDD-hh:mm:sss] (sss = milliseconds)
 log() {
-    # GNU date supports %3N for milliseconds
     local ts="[$(date +'%Y%m%d-%H:%M:%S%3N')]"
     local msg="${ts} $*"
     if $NO_LOG; then
@@ -78,6 +80,10 @@ while [[ $# -gt 0 ]]; do
             NO_LOG=true
             shift
             ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
             show_help
@@ -94,7 +100,6 @@ if [[ -z "$SRC_DIR" || -z "$DST_DIR" ]]; then
     exit 1
 fi
 
-# Check rsync presence before doing anything else
 if ! command -v rsync >/dev/null 2>&1; then
     echo "ERROR: 'rsync' is not installed or not in PATH."
     exit 127
@@ -104,28 +109,28 @@ log "Starting synchronization (version ${VERSION})"
 log "Source folder: ${SRC_DIR}"
 log "Destination folder: ${DST_DIR}"
 
-EXCLUDE_FILE="${SRC_DIR}/.sync_exclude"
-if [[ ! -f "$EXCLUDE_FILE" ]]; then
-    log "ERROR: Exclude file '${EXCLUDE_FILE}' not found."
-    exit 1
+if $DRY_RUN; then
+    log "Dry-run mode enabled: no changes will be made."
 fi
 
-# --- Build exclude options -------------------------------------------------
-
+EXCLUDE_FILE="${SRC_DIR}/.sync_exclude"
 EXCLUDE_OPTS=( "--exclude=.git" )
-while IFS= read -r line; do
-    # Skip empty lines and simple comments
-    [[ -z "$line" ]] && continue
-    [[ "${line:0:1}" == "#" ]] && continue
-    EXCLUDE_OPTS+=( "--exclude=${line}" )
-done < "$EXCLUDE_FILE"
+
+if [[ -f "$EXCLUDE_FILE" ]]; then
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        [[ "${line:0:1}" == "#" ]] && continue
+        EXCLUDE_OPTS+=( "--exclude=${line}" )
+    done < "$EXCLUDE_FILE"
+    log "Using exclude file: ${EXCLUDE_FILE}"
+else
+    log "Exclude file '${EXCLUDE_FILE}' not found, continuing without it."
+fi
 
 # --- Run rsync -------------------------------------------------------------
 
-# Common rsync flags:
-# -a archive mode, -v verbose, --delete to mirror, -rltgoD implied by -a
-# Compression (-z) is harmless locally; keep for consistency.
 RSYNC_FLAGS=( -avz --delete )
+$DRY_RUN && RSYNC_FLAGS+=( --dry-run )
 
 log "Running: rsync ${RSYNC_FLAGS[*]} ${EXCLUDE_OPTS[*]} '${SRC_DIR}/' '${DST_DIR}/'"
 
@@ -137,15 +142,12 @@ fi
 
 RSYNC_RC=$?
 
-# --- Result handling -------------------------------------------------------
-
 case "$RSYNC_RC" in
     0)
         log "Synchronization completed successfully (rc=${RSYNC_RC})."
         ;;
     *)
         log "ERROR: rsync terminated with a non-zero exit code (rc=${RSYNC_RC})."
-        log "Refer to rsync exit codes for details (e.g., 23=partial transfer, 24=some files vanished)."
         ;;
 esac
 
