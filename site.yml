@@ -1,7 +1,7 @@
 ---
 - name: "Ansible Updates Reporting Pipeline"
-  hosts: localhost
-  gather_facts: false
+  hosts: ansible
+  gather_facts: true
   become: false
   vars_files:
     - vars/ansible-updates-reporting.yml
@@ -35,9 +35,9 @@
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
-    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
-    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
-    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
   tasks:
     - name: "(repository_setup) Execute repository manager role"
       include_role:
@@ -57,9 +57,9 @@
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
-    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
-    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
-    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
     # Transmettre l'information aux rôles
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
@@ -74,9 +74,9 @@
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
-    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
-    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
-    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
     - name: "(report_generation) Execute report generator role"
@@ -90,9 +90,9 @@
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
-    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
-    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
-    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
   tasks:
     - name: "(repository_final_update) Force regeneration of all indexes and APIs"
       include_tasks: roles/repository_manager/tasks/generate_indexes.yml
@@ -105,9 +105,9 @@
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
-    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
-    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
-    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
     - name: "(notification) Execute notification manager role"
