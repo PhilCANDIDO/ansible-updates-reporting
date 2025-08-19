@@ -1,37 +1,56 @@
 #!/bin/bash
+#
+# Name: sync_folders.sh
+# Purpose: Synchronize two folders (GitHub -> GitLab style), excluding .git and paths listed in .sync_exclude.
+#
+# Changelog:
+# - 1.0.0: Initial version (basic rsync with .git and .sync_exclude support).
+# - 1.1.0: Added --src-folder and --dst-folder parameters.
+# - 1.2.0: Removed default SRC_DIR/DST_DIR; both are now mandatory.
+# - 1.3.0: Added --no-log to print to stdout only (no log file creation).
+# - 1.4.0: Check rsync is installed; explicit check/report of rsync exit status.
+#
 
 # Script version
-VERSION="1.3.0"
+VERSION="1.4.0"
 
-# Log file
+# Log file (same basename as script, .log extension)
 LOG_FILE="$(basename "$0" .sh).log"
 NO_LOG=false
 
-# Source and destination directories (must be provided)
+# Mandatory parameters (filled by CLI)
 SRC_DIR=""
 DST_DIR=""
 
-# Help function
+# --- Helpers ---------------------------------------------------------------
+
+# Print help text
 show_help() {
-    echo "Usage: $0 --src-folder <path> --dst-folder <path> [OPTIONS]"
-    echo
-    echo "Synchronize files from a GitHub-based project folder to a GitLab-based project folder."
-    echo
-    echo "Options:"
-    echo "  -h, --help                 Show this help message"
-    echo "      --src-folder <path>    Source folder (mandatory)"
-    echo "      --dst-folder <path>    Destination folder (mandatory)"
-    echo "      --no-log               Do not write to log file (stdout only)"
-    echo
-    echo "The synchronization:"
-    echo "- Excludes .git directory and all paths in .sync_exclude file"
-    echo
-    echo "Version: $VERSION"
+    cat <<EOF
+Usage: $0 --src-folder <path> --dst-folder <path> [OPTIONS]
+
+Synchronize files from a source project folder to a destination project folder.
+Excludes the '.git' directory and all relative paths listed in the file '.sync_exclude' at the root of the source folder.
+
+Options:
+  -h, --help                 Show this help message
+      --src-folder <path>    Source folder (mandatory)
+      --dst-folder <path>    Destination folder (mandatory)
+      --no-log               Do not write a log file; print to stdout only
+
+Notes:
+- Entries in '.sync_exclude' are relative to the source root.
+- The '.git' directory is always excluded from synchronization.
+
+Version: ${VERSION}
+EOF
 }
 
-# Logging function
+# Timestamped logger: [YYYYMMDD-hh:mm:sss] (sss = milliseconds)
 log() {
-    local msg="[$(date +'%Y%m%d-%H:%M:%S')] $1"
+    # GNU date supports %3N for milliseconds
+    local ts="[$(date +'%Y%m%d-%H:%M:%S%3N')]"
+    local msg="${ts} $*"
     if $NO_LOG; then
         echo "$msg"
     else
@@ -39,7 +58,8 @@ log() {
     fi
 }
 
-# Parse arguments
+# --- Argument parsing ------------------------------------------------------
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
@@ -66,42 +86,67 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate parameters
+# --- Validation ------------------------------------------------------------
+
 if [[ -z "$SRC_DIR" || -z "$DST_DIR" ]]; then
     echo "ERROR: Both --src-folder and --dst-folder must be specified."
     show_help
     exit 1
 fi
 
-log "Starting synchronization script (version $VERSION)"
-log "Source folder: $SRC_DIR"
-log "Destination folder: $DST_DIR"
+# Check rsync presence before doing anything else
+if ! command -v rsync >/dev/null 2>&1; then
+    echo "ERROR: 'rsync' is not installed or not in PATH."
+    exit 127
+fi
 
-# Check if .sync_exclude exists
-EXCLUDE_FILE="$SRC_DIR/.sync_exclude"
+log "Starting synchronization (version ${VERSION})"
+log "Source folder: ${SRC_DIR}"
+log "Destination folder: ${DST_DIR}"
+
+EXCLUDE_FILE="${SRC_DIR}/.sync_exclude"
 if [[ ! -f "$EXCLUDE_FILE" ]]; then
-    log "ERROR: Exclude file $EXCLUDE_FILE not found"
+    log "ERROR: Exclude file '${EXCLUDE_FILE}' not found."
     exit 1
 fi
 
-# Build rsync exclude options
-EXCLUDE_OPTS="--exclude=.git"
+# --- Build exclude options -------------------------------------------------
+
+EXCLUDE_OPTS=( "--exclude=.git" )
 while IFS= read -r line; do
-    [[ -n "$line" ]] && EXCLUDE_OPTS+=" --exclude=$line"
+    # Skip empty lines and simple comments
+    [[ -z "$line" ]] && continue
+    [[ "${line:0:1}" == "#" ]] && continue
+    EXCLUDE_OPTS+=( "--exclude=${line}" )
 done < "$EXCLUDE_FILE"
 
-# Run rsync
+# --- Run rsync -------------------------------------------------------------
+
+# Common rsync flags:
+# -a archive mode, -v verbose, --delete to mirror, -rltgoD implied by -a
+# Compression (-z) is harmless locally; keep for consistency.
+RSYNC_FLAGS=( -avz --delete )
+
+log "Running: rsync ${RSYNC_FLAGS[*]} ${EXCLUDE_OPTS[*]} '${SRC_DIR}/' '${DST_DIR}/'"
+
 if $NO_LOG; then
-    rsync -avz --delete $EXCLUDE_OPTS "$SRC_DIR/" "$DST_DIR/"
+    rsync "${RSYNC_FLAGS[@]}" "${EXCLUDE_OPTS[@]}" "${SRC_DIR}/" "${DST_DIR}/"
 else
-    rsync -avz --delete $EXCLUDE_OPTS "$SRC_DIR/" "$DST_DIR/" >> "$LOG_FILE" 2>&1
-fi
-RET_CODE=$?
-
-if [[ $RET_CODE -eq 0 ]]; then
-    log "Synchronization completed successfully."
-else
-    log "ERROR: Synchronization failed with exit code $RET_CODE"
+    rsync "${RSYNC_FLAGS[@]}" "${EXCLUDE_OPTS[@]}" "${SRC_DIR}/" "${DST_DIR}/" >> "$LOG_FILE" 2>&1
 fi
 
-exit $RET_CODE
+RSYNC_RC=$?
+
+# --- Result handling -------------------------------------------------------
+
+case "$RSYNC_RC" in
+    0)
+        log "Synchronization completed successfully (rc=${RSYNC_RC})."
+        ;;
+    *)
+        log "ERROR: rsync terminated with a non-zero exit code (rc=${RSYNC_RC})."
+        log "Refer to rsync exit codes for details (e.g., 23=partial transfer, 24=some files vanished)."
+        ;;
+esac
+
+exit "$RSYNC_RC"
