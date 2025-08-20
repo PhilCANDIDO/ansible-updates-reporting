@@ -1,0 +1,119 @@
+---
+- name: "Ansible Updates Reporting Pipeline"
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_timestamp: "{{ ansible_date_time.epoch }}"
+    execution_id: "{{ ansible_date_time.iso8601_basic_short }}"
+    # Variable pour contrôler l'utilisation du repository
+    use_repository_manager: "{{ groups['repository_managers'] is defined and groups['repository_managers'] | length > 0 }}"
+  tasks:
+    - name: "(site) Validate repository manager availability"
+      ping:
+      delegate_to: "{{ groups['repository_managers'][0] }}"
+      when: use_repository_manager | bool
+      tags: [always, validation]
+
+    - name: "(site) Display repository manager status"
+      debug:
+        msg: "Repository manager will {{ 'be used' if use_repository_manager else 'NOT be used' }} for this execution"
+      tags: [always, info]
+
+    - name: "(site) Set global execution variables"
+      set_fact:
+        execution_id: "{{ execution_id }}"
+        execution_timestamp: "{{ execution_timestamp }}"
+        use_repository_manager: "{{ use_repository_manager }}"
+      tags: [always, variables]
+
+- name: "Setup Repository Manager"
+  hosts: repository_managers
+  gather_facts: true
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+  tasks:
+    - name: "(repository_setup) Execute repository manager role"
+      include_role:
+        name: repository_manager
+      when: use_repository_manager | bool
+      tags: [repository, setup]
+
+    - name: "(repository_setup) Generate API endpoints after setup"
+      include_tasks: roles/repository_manager/tasks/generate_api_endpoints.yml
+      when: use_repository_manager | bool
+      tags: [repository, api]
+
+- name: "Collect Updates Information"
+  hosts: all:!repository_managers
+  gather_facts: true
+  serial: "{{ updates_collection_serial | default('100%') }}"
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    # Transmettre l'information aux rôles
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
+  tasks:
+    - name: "(updates_collection) Execute updates collector role"
+      include_role:
+        name: updates_collector
+      tags: [collection, updates]
+
+- name: "Generate Consolidated Reports"
+  hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
+  gather_facts: true
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
+  tasks:
+    - name: "(report_generation) Execute report generator role"
+      include_role:
+        name: report_generator
+      tags: [reporting, generation]
+
+- name: "Update Repository Indexes and APIs"
+  hosts: repository_managers
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+  tasks:
+    - name: "(repository_final_update) Force regeneration of all indexes and APIs"
+      include_tasks: roles/repository_manager/tasks/generate_indexes.yml
+      when: use_repository_manager | bool
+      tags: [repository, final_update, indexes]
+
+- name: "Send Notifications"
+  hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
+    use_repository_manager: "{{ hostvars['localhost']['use_repository_manager'] }}"
+    repository_enabled: "{{ use_repository_manager | default(false) }}"
+  tasks:
+    - name: "(notification) Execute notification manager role"
+      include_role:
+        name: notification_manager
+      when: 
+        - send_notifications | default(true) | bool
+        - smtp_server is defined
+      tags: [notification, email]
