@@ -1,0 +1,70 @@
+---
+# AWX-Compatible Quick Connection Test
+# Handles SSH authentication and host key issues
+
+- name: "Quick Connection Test for AWX"
+  hosts: all:!localhost
+  gather_facts: no
+  ignore_unreachable: yes
+  vars:
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+    ansible_host_key_checking: false
+  tasks:
+    - name: "Ping test"
+      ping:
+      register: ping_result
+      ignore_errors: yes
+      
+    - name: "Get hostname if ping succeeded"
+      command: hostname
+      changed_when: false
+      register: hostname_result
+      when: ping_result is succeeded
+      ignore_errors: yes
+      
+    - name: "Alternative hostname method"
+      shell: "cat /etc/hostname || echo 'unknown'"
+      changed_when: false
+      register: hostname_alt
+      when: 
+        - ping_result is succeeded
+        - hostname_result is failed
+      ignore_errors: yes
+      
+    - name: "Show success result"
+      debug:
+        msg: "✓ {{ inventory_hostname }} ({{ hostname_result.stdout | default(hostname_alt.stdout | default('connected')) }}) - Connection OK"
+      when: ping_result is succeeded
+      
+    - name: "Show failure result"
+      debug:
+        msg: "✗ {{ inventory_hostname }} - Connection FAILED: {{ ping_result.msg | default('Unknown error') }}"
+      when: ping_result is failed
+
+- name: "Test Summary"
+  hosts: localhost
+  gather_facts: no
+  become: false
+  tasks:
+    - name: "Collect results"
+      set_fact:
+        success_hosts: "{{ groups['all'] | difference(['localhost']) | select('in', hostvars) | selectattr('ping_result', 'defined') | selectattr('ping_result', 'succeeded') | list | default([]) }}"
+        failed_hosts: "{{ groups['all'] | difference(['localhost']) | select('in', hostvars) | selectattr('ping_result', 'defined') | selectattr('ping_result', 'failed') | list | default([]) }}"
+        
+    - name: "Display summary"
+      debug:
+        msg: |
+          ==========================================
+          Connection Test Summary
+          ==========================================
+          Total Hosts: {{ groups['all'] | difference(['localhost']) | length }}
+          Successful: {{ success_hosts | length | default(0) }}
+          Failed: {{ failed_hosts | length | default(0) }}
+          
+          {% if failed_hosts | length > 0 %}
+          Failed Hosts:
+          {% for host in failed_hosts %}
+          - {{ host }}
+          {% endfor %}
+          {% endif %}
+          ==========================================
