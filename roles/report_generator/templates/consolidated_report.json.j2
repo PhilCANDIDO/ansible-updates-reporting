@@ -9,6 +9,8 @@
   },
   "summary": {
     "total_hosts": {{ aggregated_data.summary.total_hosts | int }},
+    "reachable_hosts": {{ reachable_hosts | default([]) | length | int }},
+    "unreachable_hosts": {{ unreachable_hosts | default([]) | length | int }},
     "hosts_processed": {{ aggregated_data.hosts | length | int }},
     "hosts_with_errors": {{ aggregated_data.summary.hosts_with_errors | int }},
     "total_updates": {{ aggregated_data.summary.total_updates | int }},
@@ -18,6 +20,7 @@
     "overall_priority": "{% set sec_count = aggregated_data.summary.total_security_updates | int %}{% set crit_threshold = security_thresholds.critical_updates | default(5) | int %}{{ 'HIGH' if sec_count > crit_threshold else ('MEDIUM' if sec_count > 0 else 'LOW') }}"
   },
   "hosts": {{ aggregated_data.hosts | to_nice_json }},
+  "unreachable_hosts": {{ unreachable_details | default([]) | to_nice_json }},
   "errors": {{ aggregated_data.errors | to_nice_json }},
   "os_distribution": {{ aggregated_data.by_os_family | to_nice_json }},
   "critical_hosts": {{ aggregated_data.critical_hosts | to_nice_json }},

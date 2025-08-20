@@ -29,6 +29,109 @@
         use_repository_manager: "{{ use_repository_manager }}"
       tags: [always, variables]
 
+- name: "Pre-flight Connectivity Check"
+  hosts: all:!repository_managers:!localhost:!ansible
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  vars:
+    execution_id: "{{ hostvars['ansible']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
+  tasks:
+    - name: "(connectivity) Test host connectivity"
+      ping:
+      register: ping_result
+      ignore_errors: yes
+      ignore_unreachable: yes
+
+    - name: "(connectivity) Set host connectivity status"
+      set_fact:
+        host_reachable: "{{ ping_result is succeeded }}"
+        connectivity_error: "{{ ping_result.msg | default('Host unreachable') if ping_result is failed else '' }}"
+      delegate_to: ansible
+      delegate_facts: true
+
+    - name: "(connectivity) Build connectivity report for this host"
+      set_fact:
+        connectivity_status:
+          hostname: "{{ inventory_hostname }}"
+          reachable: "{{ ping_result is succeeded }}"
+          error: "{{ ping_result.msg | default('') if ping_result is failed else '' }}"
+          timestamp: "{{ lookup('pipe', 'date -Iseconds') }}"
+      delegate_to: ansible
+      delegate_facts: false
+
+    - name: "(connectivity) Add to appropriate host list"
+      set_fact:
+        reachable_hosts: "{{ (hostvars['ansible']['reachable_hosts'] | default([])) + [inventory_hostname] }}"
+      delegate_to: ansible
+      delegate_facts: true
+      when: ping_result is succeeded
+
+    - name: "(connectivity) Add to unreachable host list"
+      set_fact:
+        unreachable_hosts: "{{ (hostvars['ansible']['unreachable_hosts'] | default([])) + [inventory_hostname] }}"
+        unreachable_details: "{{ (hostvars['ansible']['unreachable_details'] | default([])) + [{'hostname': inventory_hostname, 'error': ping_result.msg | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}] }}"
+      delegate_to: ansible
+      delegate_facts: true
+      when: ping_result is failed
+
+    - name: "(connectivity) Create report for unreachable host"
+      copy:
+        content: |
+          {
+            "hostname": "{{ inventory_hostname }}",
+            "execution_id": "{{ execution_id }}",
+            "timestamp": "{{ lookup('pipe', 'date -Iseconds') }}",
+            "status": "unreachable",
+            "error": "{{ ping_result.msg | default('Host unreachable') }}",
+            "updates": {
+              "total_count": 0,
+              "security_count": 0,
+              "packages": [],
+              "status": "unreachable"
+            }
+          }
+        dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+      when: ping_result is failed
+      ignore_errors: yes
+
+- name: "Display Connectivity Summary"
+  hosts: ansible
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  tasks:
+    - name: "(connectivity) Calculate connectivity statistics"
+      set_fact:
+        total_target_hosts: "{{ groups['all'] | difference(['repository_managers', 'localhost', 'ansible']) | flatten | unique | length }}"
+        total_reachable: "{{ reachable_hosts | default([]) | length }}"
+        total_unreachable: "{{ unreachable_hosts | default([]) | length }}"
+
+    - name: "(connectivity) Display connectivity summary"
+      debug:
+        msg: |
+          ==========================================
+          Connectivity Check Results
+          ==========================================
+          Total Target Hosts: {{ total_target_hosts }}
+          Reachable: {{ total_reachable }}
+          Unreachable: {{ total_unreachable }}
+          
+          {% if total_unreachable > 0 %}
+          Unreachable Hosts:
+          {% for host in unreachable_hosts | default([]) %}
+          - {{ host }}
+          {% endfor %}
+          {% endif %}
+          
+          Proceeding with reachable hosts only...
+          ==========================================
+      tags: [connectivity, summary]
+
 - name: "Setup Repository Manager"
   hosts: repository_managers
   gather_facts: true
@@ -51,10 +154,8 @@
       tags: [repository, api]
 
 - name: "Collect Updates Information"
-  hosts: all:!repository_managers
+  hosts: all:!repository_managers:!localhost:!ansible
   gather_facts: true
-  ignore_unreachable: yes
-  ignore_errors: yes
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars_files:
     - vars/ansible-updates-reporting.yml
@@ -62,9 +163,14 @@
     execution_id: "{{ hostvars['ansible']['execution_id'] }}"
     execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
+    reachable_hosts: "{{ hostvars['ansible']['reachable_hosts'] | default([]) }}"
     # Transmettre l'information aux rôles
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
+    - name: "(updates_collection) Skip unreachable hosts"
+      meta: end_host
+      when: inventory_hostname not in reachable_hosts
+
     - name: "(updates_collection) Execute updates collector role"
       block:
         - name: "(updates_collection) Include updates collector"
@@ -115,10 +221,15 @@
     execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
+    reachable_hosts: "{{ hostvars['ansible']['reachable_hosts'] | default([]) }}"
+    unreachable_hosts: "{{ hostvars['ansible']['unreachable_hosts'] | default([]) }}"
+    unreachable_details: "{{ hostvars['ansible']['unreachable_details'] | default([]) }}"
   tasks:
     - name: "(report_generation) Execute report generator role"
       include_role:
         name: report_generator
+      vars:
+        include_unreachable_hosts: true
       ignore_errors: yes
       tags: [reporting, generation]
 

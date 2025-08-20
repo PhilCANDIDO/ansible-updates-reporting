@@ -16,7 +16,9 @@
   set_fact:
     aggregated_data:
       summary:
-        total_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | length }}"
+        total_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
+        reachable_hosts: "{{ reachable_hosts | default([]) | length }}"
+        unreachable_hosts: "{{ unreachable_hosts | default([]) | length }}"
         total_updates: 0
         total_security_updates: 0
         hosts_requiring_reboot: 0
@@ -26,6 +28,7 @@
         storage_type: "control_node"
         report_location: "{{ control_node_reports_path }}"
       hosts: []
+      unreachable: "{{ unreachable_details | default([]) }}"
       errors: []
       by_os_family: {}
       critical_hosts: []

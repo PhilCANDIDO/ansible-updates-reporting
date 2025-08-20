@@ -237,6 +237,14 @@
                 <div class="stat-label">Total Hosts</div>
             </div>
             <div class="stat-card">
+                <div class="stat-number" style="color: #28a745;">{{ aggregated_data.summary.reachable_hosts | default(aggregated_data.hosts | length) }}</div>
+                <div class="stat-label">Reachable</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" style="color: #ffc107;">{{ aggregated_data.summary.unreachable_hosts | default(0) }}</div>
+                <div class="stat-label">Unreachable</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-number" style="color: #6f42c1;">{{ aggregated_data.summary.total_updates }}</div>
                 <div class="stat-label">Total Updates</div>
             </div>
@@ -250,7 +258,7 @@
             </div>
             <div class="stat-card">
                 <div class="stat-number" style="color: #28a745;">{{ aggregated_data.hosts | length }}</div>
-                <div class="stat-label">Successful</div>
+                <div class="stat-label">Processed</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number" style="color: #dc3545;">{{ aggregated_data.summary.hosts_with_errors }}</div>
@@ -282,6 +290,34 @@
                         <td><span class="critical-high">{{ host.security_updates }}</span></td>
                         <td>{{ host.total_updates }}</td>
                         <td>{{ '✅ Yes' if host.requires_reboot else '❌ No' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Unreachable Hosts Section -->
+        {% if unreachable_details | default([]) | length > 0 %}
+        <div class="section">
+            <h2>⚠️ Unreachable Hosts</h2>
+            <div class="alert" style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px;">
+                <strong>Warning:</strong> The following hosts were unreachable during the connectivity check and were not processed.
+            </div>
+            <table class="hosts-table">
+                <thead>
+                    <tr>
+                        <th>Hostname</th>
+                        <th>Error Message</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in unreachable_details %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td style="color: #dc3545;">{{ host.error | default('Connection failed') }}</td>
+                        <td>{{ host.timestamp | default('N/A') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
