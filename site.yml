@@ -53,6 +53,8 @@
 - name: "Collect Updates Information"
   hosts: all:!repository_managers
   gather_facts: true
+  ignore_unreachable: yes
+  ignore_errors: yes
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars_files:
     - vars/ansible-updates-reporting.yml
@@ -64,13 +66,48 @@
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
     - name: "(updates_collection) Execute updates collector role"
-      include_role:
-        name: updates_collector
+      block:
+        - name: "(updates_collection) Include updates collector"
+          include_role:
+            name: updates_collector
+          
+        - name: "(updates_collection) Mark host as successful"
+          set_fact:
+            host_collection_status: "success"
+            
+      rescue:
+        - name: "(updates_collection) Handle collection failure"
+          set_fact:
+            host_collection_status: "failed"
+            collection_error: "{{ ansible_failed_result.msg | default('Collection failed') }}"
+            
+        - name: "(updates_collection) Create error report for failed host"
+          copy:
+            content: |
+              {
+                "hostname": "{{ inventory_hostname }}",
+                "execution_id": "{{ execution_id }}",
+                "timestamp": "{{ lookup('pipe', 'date -Iseconds') }}",
+                "status": "failed",
+                "error": "{{ collection_error }}",
+                "updates": {
+                  "total_count": 0,
+                  "security_count": 0,
+                  "packages": [],
+                  "status": "collection_failed"
+                }
+              }
+            dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
+            mode: '0644'
+          delegate_to: localhost
+          become: false
+          ignore_errors: yes
       tags: [collection, updates]
 
 - name: "Generate Consolidated Reports"
   hosts: "{{ groups['repository_managers'] if (groups['repository_managers'] is defined and groups['repository_managers'] | length > 0) else 'localhost' }}"
   gather_facts: true
+  become: false
   vars_files:
     - vars/ansible-updates-reporting.yml
   vars:
@@ -82,6 +119,7 @@
     - name: "(report_generation) Execute report generator role"
       include_role:
         name: report_generator
+      ignore_errors: yes
       tags: [reporting, generation]
 
 - name: "Update Repository Indexes and APIs"

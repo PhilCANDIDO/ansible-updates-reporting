@@ -11,7 +11,9 @@
     state: directory
     mode: '0755'
   delegate_to: localhost
+  become: false
   run_once: true
+  ignore_errors: yes
   tags: [generation, local, setup]
 
 - name: "(generate_local_report) Generate local JSON report for this host"
@@ -20,6 +22,8 @@
     dest: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
     mode: '0644'
   delegate_to: localhost
+  become: false
+  ignore_errors: yes
   tags: [generation, local, json]
 
 - name: "(generate_local_report) Display local report location"

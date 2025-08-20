@@ -7,30 +7,64 @@
   include_tasks: detect_os.yml
   tags: [detection, os]
 
-- name: "(updates_collector) Include Debian/Ubuntu updates collection"
-  include_tasks: collect_debian_updates.yml
-  when: ansible_os_family == "Debian"
-  tags: [collection, debian, ubuntu]
+- name: "(updates_collector) Collect updates for the appropriate OS"
+  block:
+    - name: "(updates_collector) Include Debian/Ubuntu updates collection"
+      include_tasks: collect_debian_updates.yml
+      when: ansible_os_family == "Debian"
+      tags: [collection, debian, ubuntu]
 
-- name: "(updates_collector) Include RedHat/CentOS/Rocky/Alma updates collection"
-  include_tasks: collect_redhat_updates.yml
-  when: ansible_os_family == "RedHat"
-  tags: [collection, redhat, centos, rocky, alma]
+    - name: "(updates_collector) Include RedHat/CentOS/Rocky/Alma updates collection"
+      include_tasks: collect_redhat_updates.yml
+      when: ansible_os_family == "RedHat"
+      tags: [collection, redhat, centos, rocky, alma]
 
-- name: "(updates_collector) Include SUSE updates collection"
-  include_tasks: collect_suse_updates.yml
-  when: ansible_os_family == "Suse"
-  tags: [collection, suse, opensuse]
+    - name: "(updates_collector) Include SUSE updates collection"
+      include_tasks: collect_suse_updates.yml
+      when: ansible_os_family == "Suse"
+      tags: [collection, suse, opensuse]
+      
+  rescue:
+    - name: "(updates_collector) Handle collection failure"
+      set_fact:
+        collected_updates:
+          total_count: 0
+          security_count: 0
+          packages: []
+          error: "Failed to collect updates: {{ ansible_failed_result.msg | default('Unknown error') }}"
+          status: "failed"
+      tags: [collection, error]
 
-- name: "(updates_collector) Include repository-based host report generation"
-  include_tasks: generate_host_report.yml
-  when: 
-    - use_repository_manager | default(false) | bool
-    - groups['repository_managers'] is defined
-    - groups['repository_managers'] | length > 0
-  tags: [generation, host_report, repository]
+- name: "(updates_collector) Generate reports"
+  block:
+    - name: "(updates_collector) Include repository-based host report generation"
+      include_tasks: generate_host_report.yml
+      when: 
+        - use_repository_manager | default(false) | bool
+        - groups['repository_managers'] is defined
+        - groups['repository_managers'] | length > 0
+      tags: [generation, host_report, repository]
 
-- name: "(updates_collector) Include local host report generation"
-  include_tasks: generate_local_report.yml
-  when: not (use_repository_manager | default(false) | bool)
-  tags: [generation, host_report, local]
+    - name: "(updates_collector) Include local host report generation"
+      include_tasks: generate_local_report.yml
+      when: not (use_repository_manager | default(false) | bool)
+      tags: [generation, host_report, local]
+      
+  rescue:
+    - name: "(updates_collector) Ensure report exists even on failure"
+      copy:
+        content: |
+          {
+            "hostname": "{{ inventory_hostname }}",
+            "execution_id": "{{ execution_id | default('unknown') }}",
+            "timestamp": "{{ lookup('pipe', 'date -Iseconds') }}",
+            "status": "failed",
+            "error": "Report generation failed",
+            "updates": {{ collected_updates | default({'total_count': 0, 'security_count': 0, 'packages': [], 'status': 'unavailable'}) | to_nice_json }}
+          }
+        dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+      ignore_errors: yes
+      tags: [generation, error]

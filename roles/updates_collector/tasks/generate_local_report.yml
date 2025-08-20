@@ -1,0 +1,84 @@
+---
+# Generate local report without repository manager
+# This file handles report generation when repository manager is not available
+
+- name: "(generate_local_report) Ensure execution_id is defined"
+  set_fact:
+    execution_id: "{{ execution_id | default(lookup('pipe', 'date +%Y%m%d%H%M%S')) }}"
+  when: execution_id is not defined
+  tags: [generation, local, variables]
+
+- name: "(generate_local_report) Set local reports path"
+  set_fact:
+    local_reports_path: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') if lookup('env', 'AWX_HOST') else '/tmp/ansible-reports' }}"
+  tags: [generation, local, variables]
+
+- name: "(generate_local_report) Create local reports directory"
+  file:
+    path: "{{ local_reports_path }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  ignore_errors: yes
+  tags: [generation, local, setup]
+
+- name: "(generate_local_report) Generate report for host"
+  block:
+    - name: "(generate_local_report) Generate local JSON report for this host"
+      template:
+        src: host_report.json.j2
+        dest: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+      tags: [generation, local, json]
+      
+    - name: "(generate_local_report) Set success status"
+      set_fact:
+        host_report_status: "success"
+        host_report_path: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+      tags: [generation, local, status]
+      
+  rescue:
+    - name: "(generate_local_report) Handle report generation failure"
+      copy:
+        content: |
+          {
+            "hostname": "{{ inventory_hostname }}",
+            "execution_id": "{{ execution_id }}",
+            "timestamp": "{{ lookup('pipe', 'date -Iseconds') }}",
+            "status": "failed",
+            "error": "Failed to generate report: {{ ansible_failed_result.msg | default('Unknown error') }}",
+            "updates": {
+              "total_count": 0,
+              "security_count": 0,
+              "packages": [],
+              "error": "Report generation failed"
+            }
+          }
+        dest: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+      ignore_errors: yes
+      tags: [generation, local, error]
+      
+    - name: "(generate_local_report) Set failure status"
+      set_fact:
+        host_report_status: "failed"
+        host_report_path: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+      tags: [generation, local, status]
+
+- name: "(generate_local_report) Display local report location"
+  debug:
+    msg: "Local report generated at: {{ local_reports_path }}/{{ inventory_hostname }}.json (Status: {{ host_report_status }})"
+  tags: [generation, local, info]
+
+- name: "(generate_local_report) Set fact for local report path"
+  set_fact:
+    host_report_path: "{{ local_reports_path }}/{{ inventory_hostname }}.json"
+    report_storage_type: "local"
+    report_status: "{{ host_report_status | default('unknown') }}"
+  tags: [generation, local, facts]
