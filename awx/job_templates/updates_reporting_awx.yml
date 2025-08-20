@@ -8,7 +8,7 @@ job_templates:
     inventory: "production"
     project: "ansible-updates-reporting"
     playbook: "site_awx.yml"
-    become_enabled: true
+    become_enabled: false
     diff_mode: false
     verbosity: 0
     

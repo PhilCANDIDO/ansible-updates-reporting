@@ -4,6 +4,7 @@
 - name: "AWX Updates Reporting Pipeline - Setup"
   hosts: localhost
   gather_facts: true
+  become: false
   vars_files:
     - vars/ansible-updates-reporting.yml
     - vars/awx_mode.yml
@@ -82,6 +83,7 @@
 - name: "Generate Consolidated Reports - AWX Mode"
   hosts: "{{ 'localhost' if is_awx_environment else (groups['repository_managers'][0] if groups['repository_managers'] is defined else 'localhost') }}"
   gather_facts: true
+  become: false
   vars_files:
     - vars/ansible-updates-reporting.yml
     - vars/awx_mode.yml
@@ -103,6 +105,7 @@
 - name: "Send Notifications - AWX Mode"
   hosts: localhost
   gather_facts: false
+  become: false
   vars_files:
     - vars/ansible-updates-reporting.yml
     - vars/awx_mode.yml
@@ -128,6 +131,7 @@
 - name: "AWX Final Summary"
   hosts: localhost
   gather_facts: false
+  become: false
   vars_files:
     - vars/awx_mode.yml
   vars:
