@@ -121,7 +121,7 @@
           Reachable: {{ total_reachable }}
           Unreachable: {{ total_unreachable }}
           
-          {% if total_unreachable > 0 %}
+          {% if total_unreachable | int > 0 %}
           Unreachable Hosts:
           {% for host in unreachable_hosts | default([]) %}
           - {{ host }}
