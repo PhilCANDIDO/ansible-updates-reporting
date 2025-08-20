@@ -1,0 +1,19 @@
+---
+# Quick Connection Test - Minimal version
+# Usage: ansible-playbook -i inventory/production quick_test.yml
+
+- name: "Quick Connection Test"
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: "Ping test"
+      ping:
+      
+    - name: "Get hostname"
+      command: hostname
+      changed_when: false
+      register: hostname_result
+      
+    - name: "Show result"
+      debug:
+        msg: "✓ {{ inventory_hostname }} ({{ hostname_result.stdout }}) - Connection OK"

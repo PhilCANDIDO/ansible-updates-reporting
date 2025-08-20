@@ -1,0 +1,70 @@
+---
+# Simple Connection Test Playbook
+# This playbook tests connectivity to all managed nodes in the inventory
+
+- name: "Test Connection to All Managed Nodes"
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Test basic connectivity with ping module"
+      ping:
+      register: ping_result
+      
+    - name: "Display connection status"
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Connection: SUCCESS
+          Response: {{ ping_result.ping }}
+      when: ping_result is succeeded
+
+- name: "Gather System Information from Connected Hosts"
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: "Display system information"
+      debug:
+        msg: |
+          === System Information for {{ inventory_hostname }} ===
+          Hostname: {{ ansible_hostname }}
+          FQDN: {{ ansible_fqdn | default('N/A') }}
+          IP Address: {{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0] | default('N/A')) }}
+          OS Family: {{ ansible_os_family }}
+          Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Python: {{ ansible_python_version }}
+          Available Memory: {{ ansible_memfree_mb }} MB free / {{ ansible_memtotal_mb }} MB total
+          CPU Cores: {{ ansible_processor_vcpus | default(ansible_processor_cores) }}
+          
+    - name: "Check if host requires reboot"
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+      when: ansible_os_family == "Debian"
+      
+    - name: "Display reboot status for Debian/Ubuntu"
+      debug:
+        msg: "Reboot required: {{ reboot_required.stat.exists | default(false) }}"
+      when: ansible_os_family == "Debian"
+
+- name: "Connection Test Summary"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Generate summary report"
+      debug:
+        msg: |
+          ========================================
+          Connection Test Summary
+          ========================================
+          Total Hosts Tested: {{ groups['all'] | length }}
+          
+          Hosts by OS Family:
+          {% for group in groups.keys() %}
+          {% if group not in ['all', 'ungrouped'] %}
+          - {{ group }}: {{ groups[group] | length }} hosts
+          {% endif %}
+          {% endfor %}
+          
+          All hosts tested: {{ groups['all'] | join(', ') }}
+          ========================================
