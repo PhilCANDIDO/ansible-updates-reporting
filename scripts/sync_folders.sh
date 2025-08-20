@@ -11,15 +11,17 @@
 # - 1.4.0: Check rsync is installed; explicit check/report of rsync exit status.
 # - 1.5.0: Added --dry-run to preview changes without applying them.
 # - 1.6.0: If .sync_exclude does not exist, continue sync without error.
+# - 1.7.0: Added --delete-extra to remove files in destination not present in source (default: no deletion).
 #
 
 # Script version
-VERSION="1.6.0"
+VERSION="1.7.0"
 
 # Log file (same basename as script, .log extension)
 LOG_FILE="$(basename "$0" .sh).log"
 NO_LOG=false
 DRY_RUN=false
+DELETE_EXTRA=false
 
 # Mandatory parameters (filled by CLI)
 SRC_DIR=""
@@ -40,11 +42,13 @@ Options:
       --dst-folder <path>    Destination folder (mandatory)
       --no-log               Do not write a log file; print to stdout only
       --dry-run              Show what would be done without making changes
+      --delete-extra         Delete files in destination that are not present in source
 
 Notes:
 - Entries in '.sync_exclude' are relative to the source root.
 - The '.git' directory is always excluded from synchronization.
-- If '.sync_exclude' does not exist, sync continues normally.
+- If '.sync_exclude' does not exist, sync continues normally (only '.git' excluded).
+- Default behavior is NON-destructive: no deletions in destination unless --delete-extra is set.
 
 Version: ${VERSION}
 EOF
@@ -84,6 +88,10 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=true
             shift
             ;;
+        --delete-extra)
+            DELETE_EXTRA=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
             show_help
@@ -108,10 +116,10 @@ fi
 log "Starting synchronization (version ${VERSION})"
 log "Source folder: ${SRC_DIR}"
 log "Destination folder: ${DST_DIR}"
+$DRY_RUN && log "Dry-run mode enabled: no changes will be made."
+$DELETE_EXTRA && log "Deletion enabled: destination-only files will be removed."
 
-if $DRY_RUN; then
-    log "Dry-run mode enabled: no changes will be made."
-fi
+# --- Exclusions ------------------------------------------------------------
 
 EXCLUDE_FILE="${SRC_DIR}/.sync_exclude"
 EXCLUDE_OPTS=( "--exclude=.git" )
@@ -129,8 +137,9 @@ fi
 
 # --- Run rsync -------------------------------------------------------------
 
-RSYNC_FLAGS=( -avz --delete )
+RSYNC_FLAGS=( -avz )
 $DRY_RUN && RSYNC_FLAGS+=( --dry-run )
+$DELETE_EXTRA && RSYNC_FLAGS+=( --delete )
 
 log "Running: rsync ${RSYNC_FLAGS[*]} ${EXCLUDE_OPTS[*]} '${SRC_DIR}/' '${DST_DIR}/'"
 
