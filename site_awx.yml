@@ -3,7 +3,7 @@
 
 - name: "AWX Updates Reporting Pipeline - Setup"
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
   vars_files:
     - vars/ansible-updates-reporting.yml
     - vars/awx_mode.yml
@@ -130,14 +130,23 @@
   gather_facts: false
   vars_files:
     - vars/awx_mode.yml
+  vars:
+    execution_id: "{{ hostvars['localhost']['execution_id'] }}"
+    execution_timestamp: "{{ hostvars['localhost']['execution_timestamp'] }}"
   tasks:
+    - name: "(awx_summary) Get current timestamp"
+      command: date -Iseconds
+      register: current_timestamp
+      changed_when: false
+      tags: [summary, timestamp]
+
     - name: "(awx_summary) Display execution summary"
       debug:
         msg: |
           AWX Updates Reporting Execution Complete
           =========================================
           Job ID: {{ awx_job_id }}
-          Execution Time: {{ ansible_date_time.iso8601 }}
+          Execution Time: {{ current_timestamp.stdout }}
           Mode: {{ 'AWX/Tower' if is_awx_environment else 'Standard Ansible' }}
           
           Reports generated in: {{ reports_storage_path }}
@@ -154,7 +163,7 @@
           job_completion:
             status: "success"
             execution_id: "{{ awx_job_id }}"
-            timestamp: "{{ ansible_date_time.iso8601 }}"
+            timestamp: "{{ current_timestamp.stdout }}"
             reports_path: "{{ reports_storage_path }}"
         per_host: false
       when: is_awx_environment

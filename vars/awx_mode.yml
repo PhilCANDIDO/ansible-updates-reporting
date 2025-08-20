@@ -8,7 +8,7 @@ tower_execution_mode: "{{ lookup('env', 'TOWER_HOST') | length > 0 }}"
 is_awx_environment: "{{ awx_execution_mode or tower_execution_mode }}"
 
 # AWX/Tower specific variables
-awx_job_id: "{{ lookup('env', 'JOB_ID') | default('local_' + ansible_date_time.epoch) }}"
+awx_job_id: "{{ lookup('env', 'JOB_ID') | default('local_' + lookup('pipe', 'date +%s')) }}"
 awx_job_template_id: "{{ lookup('env', 'JOB_TEMPLATE_ID') | default('none') }}"
 awx_inventory_id: "{{ lookup('env', 'INVENTORY_ID') | default('none') }}"
 awx_project_revision: "{{ lookup('env', 'PROJECT_REVISION') | default('local') }}"

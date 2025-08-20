@@ -33,7 +33,7 @@
         job_details: "{{ awx_base_url }}/#/jobs/playbook/{{ awx_job_id }}"
       execution_info:
         job_id: "{{ awx_job_id }}"
-        timestamp: "{{ ansible_date_time.iso8601 }}"
+        timestamp: "{{ lookup('pipe', 'date -Iseconds') }}"
   tags: [awx, notification, payload]
 
 - name: "(awx_notify) Set AWX notification statistics"
@@ -164,7 +164,7 @@
       {
         "notification_type": "awx_updates_report",
         "job_id": "{{ awx_job_id }}",
-        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "timestamp": "{{ lookup('pipe', 'date -Iseconds') }}",
         "severity": "{{ notification_payload.severity }}",
         "summary": {{ notification_payload.summary | to_nice_json }},
         "critical_hosts": {{ notification_payload.critical_hosts | to_nice_json }},
