@@ -61,3 +61,29 @@ api_cache_duration_minutes: 5
 # smtp_password: "{{ vault_smtp_password | default('') }}"
 # smtp_use_tls: "{{ vault_smtp_use_tls | default(true) }}"
 # smtp_from: "{{ vault_smtp_from | default('ansible-reports@company.com') }}"
+
+# AWX Integration Settings
+awx_integration_enabled: "{{ lookup('env', 'AWX_HOST') | length > 0 or lookup('env', 'TOWER_HOST') | length > 0 }}"
+awx_artifacts_enabled: true
+awx_fact_caching_enabled: true
+awx_use_container_excel: true
+
+# AWX-specific overrides (applied when running in AWX)
+awx_overrides:
+  use_repository_manager: false  # Disabled in AWX mode
+  local_reports_path: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/awx_artifacts') }}"
+  disable_localhost_delegation: true
+  use_set_stats: true
+
+# Webhook configuration for notifications
+# webhook_url: "{{ vault_webhook_url | default('') }}"
+# webhook_token: "{{ vault_webhook_token | default('') }}"
+
+# Container runtime for Excel generation in AWX
+container_runtime_preference: "podman"  # podman or docker
+container_image_excel: "python:3.9-slim"
+
+# Dual-mode execution settings
+maintain_backward_compatibility: true
+enable_dual_mode_execution: true
+auto_detect_execution_mode: true

@@ -1,0 +1,70 @@
+---
+# CSV Fallback Generation for AWX
+
+- name: "(csv_fallback) Generate CSV summary report"
+  copy:
+    content: |
+      Metric,Value
+      Total Hosts,{{ consolidated_data.summary.total_hosts }}
+      Total Updates,{{ consolidated_data.summary.total_updates }}
+      Security Updates,{{ consolidated_data.summary.total_security_updates }}
+      Hosts Requiring Reboot,{{ consolidated_data.summary.hosts_requiring_reboot }}
+      Critical Security Hosts,{{ consolidated_data.security_analysis.critical_hosts | length }}
+      Execution ID,{{ awx_job_id }}
+      Timestamp,{{ ansible_date_time.iso8601 }}
+    dest: "{{ reports_storage_path }}/summary_{{ awx_job_id }}.csv"
+    mode: '0644'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, csv, summary]
+
+- name: "(csv_fallback) Generate CSV host details"
+  copy:
+    content: |
+      Hostname,OS Family,Distribution,Version,Total Updates,Security Updates,Requires Reboot,Collection Time
+      {% for host in consolidated_data.hosts %}
+      {{ host.hostname }},{{ host.os_family }},{{ host.distribution }},{{ host.distribution_version }},{{ host.updates.total_count | default(0) }},{{ host.updates.security_count | default(0) }},{{ host.requires_reboot | default(false) }},{{ host.collection_timestamp }}
+      {% endfor %}
+    dest: "{{ reports_storage_path }}/hosts_{{ awx_job_id }}.csv"
+    mode: '0644'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, csv, hosts]
+
+- name: "(csv_fallback) Generate CSV packages list"
+  copy:
+    content: |
+      Hostname,Package Name,Current Version,Available Version,Is Security,Repository
+      {% for host in consolidated_data.hosts %}
+      {% if host.updates.packages is defined %}
+      {% for package in host.updates.packages %}
+      {{ host.hostname }},{{ package.name }},{{ package.current_version | default('N/A') }},{{ package.available_version | default('N/A') }},{{ package.is_security | default(false) }},{{ package.repository | default('N/A') }}
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+    dest: "{{ reports_storage_path }}/packages_{{ awx_job_id }}.csv"
+    mode: '0644'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  when: consolidated_data.hosts[0].updates.packages is defined
+  tags: [awx, csv, packages]
+
+- name: "(csv_fallback) Register CSV reports as artifacts"
+  set_stats:
+    data:
+      artifacts:
+        csv_summary: "{{ reports_storage_path }}/summary_{{ awx_job_id }}.csv"
+        csv_hosts: "{{ reports_storage_path }}/hosts_{{ awx_job_id }}.csv"
+        csv_packages: "{{ reports_storage_path }}/packages_{{ awx_job_id }}.csv"
+      csv_generation:
+        status: "completed"
+        reason: "Excel generation not available, CSV generated as fallback"
+    per_host: false
+  when: use_set_stats
+  tags: [awx, csv, artifacts]
+
+- name: "(csv_fallback) Display CSV generation notice"
+  debug:
+    msg: |
+      CSV files generated as fallback:
+      - Summary: summary_{{ awx_job_id }}.csv
+      - Host Details: hosts_{{ awx_job_id }}.csv
+      - Package List: packages_{{ awx_job_id }}.csv
+  tags: [awx, csv, info]

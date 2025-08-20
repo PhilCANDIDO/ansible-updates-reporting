@@ -1,0 +1,176 @@
+---
+# AWX Job Template Configuration for Updates Reporting
+
+job_templates:
+  - name: "Updates Reporting - AWX Mode"
+    description: "Collect and report system updates across infrastructure with AWX optimizations"
+    job_type: "run"
+    inventory: "production"
+    project: "ansible-updates-reporting"
+    playbook: "site_awx.yml"
+    become_enabled: true
+    diff_mode: false
+    verbosity: 0
+    
+    credentials:
+      - "SSH Credential"
+      - "Vault Credential"
+      
+    extra_vars:
+      # Force AWX mode
+      is_awx_environment: true
+      
+      # Disable incompatible features
+      use_repository_manager: false
+      disable_localhost_delegation: true
+      
+      # Enable AWX features
+      use_awx_artifacts: true
+      use_fact_caching: true
+      use_set_stats: true
+      
+      # Report formats
+      report_formats:
+        - json
+        - html
+        - csv
+      
+      # Notification settings
+      send_notifications: true
+      
+      # Security thresholds
+      security_thresholds:
+        critical_updates: 5
+        security_updates: 10
+        total_updates: 50
+    
+    # AWX-specific settings
+    use_fact_cache: true
+    fact_cache_timeout: 3600
+    
+    allow_simultaneous: false
+    
+    ask_variables_on_launch: true
+    ask_inventory_on_launch: false
+    ask_credential_on_launch: false
+    ask_diff_mode_on_launch: false
+    ask_limit_on_launch: true
+    ask_tags_on_launch: true
+    ask_skip_tags_on_launch: true
+    ask_job_type_on_launch: false
+    ask_verbosity_on_launch: true
+    
+    survey_enabled: true
+    survey_spec:
+      name: "Updates Reporting Configuration"
+      description: "Configure report generation options"
+      spec:
+        - question_name: "Report Formats"
+          question_description: "Select which report formats to generate"
+          required: true
+          type: "multiselect"
+          variable: "report_formats"
+          default: "json\nhtml"
+          choices:
+            - "json"
+            - "html"
+            - "csv"
+            - "excel"
+            
+        - question_name: "Send Notifications"
+          question_description: "Send email notifications for critical updates"
+          required: true
+          type: "multiplechoice"
+          variable: "send_notifications"
+          default: "true"
+          choices:
+            - "true"
+            - "false"
+            
+        - question_name: "Critical Updates Threshold"
+          question_description: "Number of critical updates to trigger alerts"
+          required: true
+          type: "integer"
+          variable: "critical_threshold"
+          default: 5
+          min: 1
+          max: 100
+          
+        - question_name: "Collection Serial Percentage"
+          question_description: "Percentage of hosts to process simultaneously"
+          required: true
+          type: "text"
+          variable: "updates_collection_serial"
+          default: "50%"
+    
+    notification_templates_started: []
+    notification_templates_success:
+      - "Email - Updates Report Success"
+    notification_templates_error:
+      - "Email - Updates Report Failure"
+    
+    labels:
+      - "reporting"
+      - "updates"
+      - "security"
+      - "awx-optimized"
+    
+    timeout: 3600
+    
+    custom_virtualenv: "/var/lib/awx/venv/ansible-updates/"
+
+  - name: "Updates Reporting - Traditional Mode"
+    description: "Collect and report system updates using traditional Ansible approach"
+    job_type: "run"
+    inventory: "production"
+    project: "ansible-updates-reporting"
+    playbook: "site.yml"
+    become_enabled: true
+    
+    credentials:
+      - "SSH Credential"
+      - "Vault Credential"
+      
+    extra_vars:
+      # Traditional mode settings
+      use_repository_manager: true
+      send_notifications: true
+      
+      report_formats:
+        - json
+        - html
+        - excel
+    
+    allow_simultaneous: false
+    
+    labels:
+      - "reporting"
+      - "updates"
+      - "traditional"
+
+  - name: "Updates Reporting - Quick Check"
+    description: "Quick security updates check without full reporting"
+    job_type: "check"
+    inventory: "production"
+    project: "ansible-updates-reporting"
+    playbook: "site_awx.yml"
+    
+    credentials:
+      - "SSH Credential"
+      
+    extra_vars:
+      is_awx_environment: true
+      report_formats:
+        - json
+      send_notifications: false
+      
+    limit: ""
+    
+    ask_limit_on_launch: true
+    
+    labels:
+      - "check"
+      - "quick"
+      - "security"
+    
+    timeout: 600

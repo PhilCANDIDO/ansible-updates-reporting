@@ -1,0 +1,204 @@
+---
+# AWX-Compatible Notification Tasks
+
+- name: "(awx_notify) Include AWX mode variables"
+  include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - awx_mode.yml
+      paths:
+        - "{{ playbook_dir }}/vars"
+      skip: true
+  tags: [awx, notification, setup]
+
+- name: "(awx_notify) Gather consolidated data"
+  set_fact:
+    consolidated_data: "{{ hostvars['localhost']['consolidated_data'] | default({}) }}"
+  when: consolidated_data is not defined
+  tags: [awx, notification, data]
+
+- name: "(awx_notify) Prepare notification payload"
+  set_fact:
+    notification_payload:
+      summary:
+        total_hosts: "{{ consolidated_data.summary.total_hosts | default(0) }}"
+        total_updates: "{{ consolidated_data.summary.total_updates | default(0) }}"
+        security_updates: "{{ consolidated_data.summary.total_security_updates | default(0) }}"
+        hosts_requiring_reboot: "{{ consolidated_data.summary.hosts_requiring_reboot | default(0) }}"
+      critical_hosts: "{{ consolidated_data.security_analysis.critical_hosts | default([]) }}"
+      security_hosts: "{{ consolidated_data.security_analysis.hosts_with_security_updates | default([]) }}"
+      severity: "{{ 'CRITICAL' if (consolidated_data.security_analysis.critical_hosts | default([]) | length) > 0 else ('HIGH' if (consolidated_data.summary.total_security_updates | default(0)) > security_thresholds.security_updates else 'INFO') }}"
+      report_urls:
+        artifacts: "{{ awx_base_url }}/api/v2/jobs/{{ awx_job_id }}/artifacts/"
+        job_details: "{{ awx_base_url }}/#/jobs/playbook/{{ awx_job_id }}"
+      execution_info:
+        job_id: "{{ awx_job_id }}"
+        timestamp: "{{ ansible_date_time.iso8601 }}"
+  tags: [awx, notification, payload]
+
+- name: "(awx_notify) Set AWX notification statistics"
+  set_stats:
+    data:
+      notifications:
+        status: "pending"
+        severity: "{{ notification_payload.severity }}"
+        recipients_count: "{{ notification_recipients | length }}"
+        summary: |
+          Updates Report - {{ notification_payload.severity }}
+          Total Hosts: {{ notification_payload.summary.total_hosts }}
+          Security Updates: {{ notification_payload.summary.security_updates }}
+          Critical Hosts: {{ notification_payload.critical_hosts | length }}
+    per_host: false
+  when: use_set_stats
+  tags: [awx, notification, stats]
+
+- name: "(awx_notify) Generate notification content for AWX"
+  set_fact:
+    awx_notification_content: |
+      AWX Updates Report - Job #{{ awx_job_id }}
+      ==========================================
+      Severity: {{ notification_payload.severity }}
+      Timestamp: {{ notification_payload.execution_info.timestamp }}
+      
+      SUMMARY
+      -------
+      • Total Hosts Scanned: {{ notification_payload.summary.total_hosts }}
+      • Total Updates Available: {{ notification_payload.summary.total_updates }}
+      • Security Updates: {{ notification_payload.summary.security_updates }}
+      • Hosts Requiring Reboot: {{ notification_payload.summary.hosts_requiring_reboot }}
+      
+      {% if notification_payload.critical_hosts | length > 0 %}
+      CRITICAL SECURITY HOSTS ({{ notification_payload.critical_hosts | length }})
+      -------------------------------
+      {% for host in notification_payload.critical_hosts %}
+      • {{ host }}
+      {% endfor %}
+      {% endif %}
+      
+      {% if notification_payload.security_hosts | length > 0 %}
+      HOSTS WITH SECURITY UPDATES ({{ notification_payload.security_hosts | length }})
+      ------------------------------------
+      {% for host in notification_payload.security_hosts[:10] %}
+      • {{ host }}
+      {% endfor %}
+      {% if notification_payload.security_hosts | length > 10 %}
+      ... and {{ notification_payload.security_hosts | length - 10 }} more
+      {% endif %}
+      {% endif %}
+      
+      VIEW FULL REPORT
+      ----------------
+      Job Details: {{ notification_payload.report_urls.job_details }}
+      Artifacts: {{ notification_payload.report_urls.artifacts }}
+  tags: [awx, notification, content]
+
+- name: "(awx_notify) Use AWX native notifications if configured"
+  block:
+    - name: "(awx_notify) Trigger AWX notification via API"
+      uri:
+        url: "{{ awx_base_url }}/api/v2/jobs/{{ awx_job_id }}/notifications/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ awx_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          notification_type: "email"
+          recipients: "{{ notification_recipients | map(attribute='email') | list }}"
+          subject: "Updates Report - {{ notification_payload.severity }} - Job #{{ awx_job_id }}"
+          body: "{{ awx_notification_content }}"
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: awx_notification_result
+      failed_when: false
+      when: awx_token | length > 0
+      
+    - name: "(awx_notify) Report notification status"
+      set_stats:
+        data:
+          notifications:
+            status: "{{ 'sent' if awx_notification_result.status == 200 else 'failed' }}"
+            method: "awx_api"
+            response_code: "{{ awx_notification_result.status | default('N/A') }}"
+        per_host: false
+      when: use_set_stats
+  when: use_awx_notifications
+  tags: [awx, notification, api]
+
+- name: "(awx_notify) Fallback to webhook notifications"
+  block:
+    - name: "(awx_notify) Send webhook notification"
+      uri:
+        url: "{{ webhook_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          source: "awx_updates_reporting"
+          job_id: "{{ awx_job_id }}"
+          severity: "{{ notification_payload.severity }}"
+          summary: "{{ notification_payload.summary }}"
+          critical_hosts: "{{ notification_payload.critical_hosts }}"
+          report_urls: "{{ notification_payload.report_urls }}"
+          timestamp: "{{ notification_payload.execution_info.timestamp }}"
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: webhook_result
+      failed_when: false
+      
+    - name: "(awx_notify) Report webhook status"
+      set_stats:
+        data:
+          notifications:
+            webhook_status: "{{ 'sent' if webhook_result.status in [200, 201, 202, 204] else 'failed' }}"
+            webhook_response: "{{ webhook_result.status | default('N/A') }}"
+        per_host: false
+      when: use_set_stats
+  when: 
+    - webhook_url is defined
+    - not use_awx_notifications or awx_notification_result.status != 200
+  tags: [awx, notification, webhook]
+
+- name: "(awx_notify) Create notification artifact"
+  copy:
+    content: |
+      {
+        "notification_type": "awx_updates_report",
+        "job_id": "{{ awx_job_id }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "severity": "{{ notification_payload.severity }}",
+        "summary": {{ notification_payload.summary | to_nice_json }},
+        "critical_hosts": {{ notification_payload.critical_hosts | to_nice_json }},
+        "security_hosts": {{ notification_payload.security_hosts | to_nice_json }},
+        "notification_sent": {{ (awx_notification_result.status == 200) | default(false) or (webhook_result.status in [200, 201, 202, 204]) | default(false) }},
+        "recipients": {{ notification_recipients | map(attribute='email') | list | to_nice_json }}
+      }
+    dest: "{{ reports_storage_path }}/notification_{{ awx_job_id }}.json"
+    mode: '0644'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, notification, artifact]
+
+- name: "(awx_notify) Register notification artifact"
+  set_stats:
+    data:
+      artifacts:
+        notification_record: "{{ reports_storage_path }}/notification_{{ awx_job_id }}.json"
+      notification_summary:
+        severity: "{{ notification_payload.severity }}"
+        critical_hosts_count: "{{ notification_payload.critical_hosts | length }}"
+        security_hosts_count: "{{ notification_payload.security_hosts | length }}"
+        notification_sent: true
+    per_host: false
+  when: use_set_stats
+  tags: [awx, notification, stats]
+
+- name: "(awx_notify) Display notification summary"
+  debug:
+    msg: |
+      AWX Notification Summary
+      ========================
+      Severity: {{ notification_payload.severity }}
+      Critical Hosts: {{ notification_payload.critical_hosts | length }}
+      Security Hosts: {{ notification_payload.security_hosts | length }}
+      Notification Method: {{ 'AWX API' if use_awx_notifications else ('Webhook' if webhook_url is defined else 'None') }}
+      Status: {{ 'Sent' if (awx_notification_result.status == 200) | default(false) or (webhook_result.status in [200, 201, 202, 204]) | default(false) else 'Not Sent' }}
+  tags: [awx, notification, summary]

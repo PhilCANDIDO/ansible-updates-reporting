@@ -1,0 +1,28 @@
+---
+galaxy_info:
+  author: AWX Updates Reporting
+  description: AWX-compatible data collector for updates reporting
+  company: 
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: EL
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+    - name: SUSE
+      versions:
+        - all
+  galaxy_tags:
+    - awx
+    - tower
+    - updates
+    - reporting
+    - artifacts
+
+dependencies: []

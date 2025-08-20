@@ -1,0 +1,31 @@
+---
+# AWX Data Collector Role Defaults
+
+# Enable AWX artifact collection
+enable_awx_artifacts: "{{ is_awx_environment | default(false) }}"
+
+# Fact caching settings
+use_cacheable_facts: "{{ is_awx_environment | default(false) }}"
+fact_cache_prefix: "updates_"
+
+# Data collection settings
+collect_update_data: true
+collect_system_info: true
+collect_security_metrics: true
+
+# Output format
+data_format: json
+compress_artifacts: false
+
+# Artifact naming
+artifact_prefix: "updates_data"
+include_timestamp: true
+timestamp_format: "%Y%m%d_%H%M%S"
+
+# Stats reporting
+report_to_stats: "{{ is_awx_environment | default(false) }}"
+stats_include_summary: true
+
+# Debug settings
+debug_artifact_creation: false
+preserve_temp_files: false

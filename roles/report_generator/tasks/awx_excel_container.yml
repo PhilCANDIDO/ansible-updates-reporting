@@ -1,0 +1,199 @@
+---
+# AWX Excel Generation Using Container
+
+- name: "(awx_excel_container) Prepare Excel generation data"
+  copy:
+    content: "{{ consolidated_data | to_nice_json }}"
+    dest: "{{ temp_storage_path }}/excel_data_{{ awx_job_id }}.json"
+    mode: '0644'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, excel, preparation]
+
+- name: "(awx_excel_container) Create Excel generation script"
+  copy:
+    content: |
+      #!/usr/bin/env python3
+      import json
+      import sys
+      from datetime import datetime
+      
+      try:
+          import openpyxl
+          from openpyxl import Workbook
+          from openpyxl.styles import Font, PatternFill, Alignment
+          from openpyxl.utils import get_column_letter
+      except ImportError:
+          print("Installing required packages...")
+          import subprocess
+          subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+          import openpyxl
+          from openpyxl import Workbook
+          from openpyxl.styles import Font, PatternFill, Alignment
+          from openpyxl.utils import get_column_letter
+      
+      def create_excel_report(json_file, output_file):
+          # Load data
+          with open(json_file, 'r') as f:
+              data = json.load(f)
+          
+          # Create workbook
+          wb = Workbook()
+          
+          # Summary sheet
+          summary_sheet = wb.active
+          summary_sheet.title = "Summary"
+          
+          # Headers
+          headers = ["Metric", "Value"]
+          for col, header in enumerate(headers, 1):
+              cell = summary_sheet.cell(row=1, column=col, value=header)
+              cell.font = Font(bold=True, color="FFFFFF")
+              cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+              cell.alignment = Alignment(horizontal="center")
+          
+          # Summary data
+          summary_data = [
+              ["Total Hosts", data['summary']['total_hosts']],
+              ["Total Updates", data['summary']['total_updates']],
+              ["Security Updates", data['summary']['total_security_updates']],
+              ["Hosts Requiring Reboot", data['summary']['hosts_requiring_reboot']],
+              ["Report Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+          ]
+          
+          for row_num, row_data in enumerate(summary_data, 2):
+              for col_num, value in enumerate(row_data, 1):
+                  summary_sheet.cell(row=row_num, column=col_num, value=value)
+          
+          # Host details sheet
+          if 'hosts' in data:
+              hosts_sheet = wb.create_sheet("Host Details")
+              
+              # Headers
+              host_headers = ["Hostname", "OS Family", "Distribution", "Total Updates", 
+                            "Security Updates", "Requires Reboot", "Collection Time"]
+              for col, header in enumerate(host_headers, 1):
+                  cell = hosts_sheet.cell(row=1, column=col, value=header)
+                  cell.font = Font(bold=True, color="FFFFFF")
+                  cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                  cell.alignment = Alignment(horizontal="center")
+              
+              # Host data
+              for row_num, host in enumerate(data['hosts'], 2):
+                  hosts_sheet.cell(row=row_num, column=1, value=host.get('hostname', 'N/A'))
+                  hosts_sheet.cell(row=row_num, column=2, value=host.get('os_family', 'N/A'))
+                  hosts_sheet.cell(row=row_num, column=3, value=host.get('distribution', 'N/A'))
+                  hosts_sheet.cell(row=row_num, column=4, value=host.get('updates', {}).get('total_count', 0))
+                  hosts_sheet.cell(row=row_num, column=5, value=host.get('updates', {}).get('security_count', 0))
+                  hosts_sheet.cell(row=row_num, column=6, value="Yes" if host.get('requires_reboot', False) else "No")
+                  hosts_sheet.cell(row=row_num, column=7, value=host.get('collection_timestamp', 'N/A'))
+              
+              # Auto-adjust column widths
+              for column in hosts_sheet.columns:
+                  max_length = 0
+                  column_letter = get_column_letter(column[0].column)
+                  for cell in column:
+                      try:
+                          if len(str(cell.value)) > max_length:
+                              max_length = len(str(cell.value))
+                      except:
+                          pass
+                  adjusted_width = min(max_length + 2, 50)
+                  hosts_sheet.column_dimensions[column_letter].width = adjusted_width
+          
+          # Security analysis sheet
+          if 'security_analysis' in data:
+              security_sheet = wb.create_sheet("Security Analysis")
+              
+              # Critical hosts
+              security_sheet.cell(row=1, column=1, value="Critical Security Hosts")
+              security_sheet.cell(row=1, column=1).font = Font(bold=True, color="FF0000")
+              
+              critical_hosts = data['security_analysis'].get('critical_hosts', [])
+              for row_num, hostname in enumerate(critical_hosts, 2):
+                  security_sheet.cell(row=row_num, column=1, value=hostname)
+              
+              # Hosts with security updates
+              security_sheet.cell(row=1, column=3, value="Hosts with Security Updates")
+              security_sheet.cell(row=1, column=3).font = Font(bold=True, color="FF6600")
+              
+              security_hosts = data['security_analysis'].get('hosts_with_security_updates', [])
+              for row_num, hostname in enumerate(security_hosts, 2):
+                  security_sheet.cell(row=row_num, column=3, value=hostname)
+          
+          # Save workbook
+          wb.save(output_file)
+          print(f"Excel report generated: {output_file}")
+      
+      if __name__ == "__main__":
+          if len(sys.argv) != 3:
+              print("Usage: python generate_excel.py <input_json> <output_xlsx>")
+              sys.exit(1)
+          
+          create_excel_report(sys.argv[1], sys.argv[2])
+    dest: "{{ temp_storage_path }}/generate_excel_{{ awx_job_id }}.py"
+    mode: '0755'
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, excel, script]
+
+- name: "(awx_excel_container) Run Excel generation in container"
+  containers.podman.podman_container:
+    name: "excel_generator_{{ awx_job_id }}"
+    image: "python:3.9-slim"
+    command: |
+      bash -c "pip install openpyxl && 
+      python /data/generate_excel_{{ awx_job_id }}.py 
+      /data/excel_data_{{ awx_job_id }}.json 
+      /data/report_{{ awx_job_id }}.xlsx"
+    volumes:
+      - "{{ temp_storage_path }}:/data:Z"
+    detach: no
+    rm: yes
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  register: excel_container_result
+  when: container_runtime == "podman"
+  tags: [awx, excel, container]
+
+- name: "(awx_excel_container) Run Excel generation in Docker container"
+  community.docker.docker_container:
+    name: "excel_generator_{{ awx_job_id }}"
+    image: "python:3.9-slim"
+    command: |
+      bash -c "pip install openpyxl && 
+      python /data/generate_excel_{{ awx_job_id }}.py 
+      /data/excel_data_{{ awx_job_id }}.json 
+      /data/report_{{ awx_job_id }}.xlsx"
+    volumes:
+      - "{{ temp_storage_path }}:/data"
+    detach: no
+    auto_remove: yes
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  register: excel_container_result
+  when: container_runtime == "docker"
+  tags: [awx, excel, container]
+
+- name: "(awx_excel_container) Move Excel report to final location"
+  command: "mv {{ temp_storage_path }}/report_{{ awx_job_id }}.xlsx {{ reports_storage_path }}/report_{{ awx_job_id }}.xlsx"
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  when: excel_container_result is succeeded
+  tags: [awx, excel, finalize]
+
+- name: "(awx_excel_container) Register Excel report as artifact"
+  set_stats:
+    data:
+      artifacts:
+        excel_report: "{{ reports_storage_path }}/report_{{ awx_job_id }}.xlsx"
+    per_host: false
+  when: 
+    - use_set_stats
+    - excel_container_result is succeeded
+  tags: [awx, excel, artifact]
+
+- name: "(awx_excel_container) Cleanup temporary files"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ temp_storage_path }}/excel_data_{{ awx_job_id }}.json"
+    - "{{ temp_storage_path }}/generate_excel_{{ awx_job_id }}.py"
+  delegate_to: "{{ 'localhost' if not disable_localhost_delegation else omit }}"
+  tags: [awx, excel, cleanup]

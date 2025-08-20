@@ -1,0 +1,205 @@
+---
+# AWX Workflow Template for Updates Reporting
+
+workflow_templates:
+  - name: "Complete Updates Reporting Workflow"
+    description: "Full updates collection, reporting, and notification workflow"
+    organization: "Default"
+    
+    survey_enabled: true
+    survey_spec:
+      name: "Workflow Configuration"
+      description: "Configure the updates reporting workflow"
+      spec:
+        - question_name: "Environment"
+          question_description: "Select target environment"
+          required: true
+          type: "multiplechoice"
+          variable: "target_inventory"
+          default: "production"
+          choices:
+            - "development"
+            - "staging"
+            - "production"
+            
+        - question_name: "Report Distribution"
+          question_description: "Email addresses for report distribution (comma-separated)"
+          required: false
+          type: "text"
+          variable: "notification_recipients_override"
+          default: ""
+    
+    extra_vars:
+      workflow_execution: true
+      workflow_timestamp: "{{ ansible_date_time.iso8601 }}"
+    
+    labels:
+      - "workflow"
+      - "updates"
+      - "complete"
+    
+    nodes:
+      - identifier: "collect_updates"
+        unified_job_template: "Updates Reporting - AWX Mode"
+        inventory: "{{ target_inventory | default('production') }}"
+        limit: ""
+        credentials: []
+        extra_data:
+          report_formats:
+            - json
+          send_notifications: false
+        
+      - identifier: "generate_reports"
+        unified_job_template: "Generate Consolidated Reports"
+        inventory: "{{ target_inventory | default('production') }}"
+        limit: "localhost"
+        success_nodes:
+          - "send_notifications"
+        failure_nodes:
+          - "error_handler"
+        credentials: []
+        extra_data:
+          report_formats:
+            - json
+            - html
+            - excel
+            
+      - identifier: "send_notifications"
+        unified_job_template: "Send Update Notifications"
+        inventory: "{{ target_inventory | default('production') }}"
+        limit: "localhost"
+        all_parents_must_converge: true
+        credentials:
+          - "SMTP Credential"
+        extra_data:
+          send_notifications: true
+          notification_recipients: "{{ notification_recipients_override | default('') }}"
+          
+      - identifier: "error_handler"
+        unified_job_template: "Error Notification Handler"
+        inventory: "localhost"
+        limit: "localhost"
+        credentials:
+          - "SMTP Credential"
+        extra_data:
+          error_context: "updates_reporting_workflow"
+          
+      - identifier: "cleanup_old_reports"
+        unified_job_template: "Cleanup Old Reports"
+        inventory: "localhost"
+        limit: "localhost"
+        success_nodes: []
+        always_nodes: []
+        extra_data:
+          retention_days: 30
+          max_reports: 50
+
+  - name: "Quick Security Check Workflow"
+    description: "Quick security updates check across infrastructure"
+    organization: "Default"
+    
+    survey_enabled: true
+    survey_spec:
+      name: "Quick Check Configuration"
+      description: "Configure quick security check"
+      spec:
+        - question_name: "Host Pattern"
+          question_description: "Limit to specific hosts (leave empty for all)"
+          required: false
+          type: "text"
+          variable: "host_limit"
+          default: ""
+          
+        - question_name: "Alert on Critical"
+          question_description: "Send alert if critical updates found"
+          required: true
+          type: "multiplechoice"
+          variable: "alert_critical"
+          default: "true"
+          choices:
+            - "true"
+            - "false"
+    
+    labels:
+      - "workflow"
+      - "quick-check"
+      - "security"
+    
+    nodes:
+      - identifier: "security_check"
+        unified_job_template: "Updates Reporting - Quick Check"
+        inventory: "production"
+        limit: "{{ host_limit | default('') }}"
+        credentials: []
+        extra_data:
+          report_formats:
+            - json
+          send_notifications: false
+          
+      - identifier: "analyze_results"
+        unified_job_template: "Analyze Security Updates"
+        inventory: "localhost"
+        limit: "localhost"
+        success_nodes:
+          - "conditional_alert"
+        extra_data:
+          analysis_type: "security"
+          
+      - identifier: "conditional_alert"
+        unified_job_template: "Send Security Alert"
+        inventory: "localhost"
+        limit: "localhost"
+        credentials:
+          - "SMTP Credential"
+        extra_data:
+          alert_type: "security_critical"
+          send_alert: "{{ alert_critical }}"
+
+  - name: "Scheduled Updates Reporting"
+    description: "Automated weekly updates reporting workflow"
+    organization: "Default"
+    
+    schedule:
+      name: "Weekly Updates Report"
+      rrule: "DTSTART:20240101T020000Z RRULE:FREQ=WEEKLY;BYDAY=MO"
+      description: "Run every Monday at 2 AM"
+    
+    labels:
+      - "workflow"
+      - "scheduled"
+      - "automated"
+    
+    nodes:
+      - identifier: "collect_all"
+        unified_job_template: "Updates Reporting - AWX Mode"
+        inventory: "production"
+        limit: ""
+        success_nodes:
+          - "generate_weekly_report"
+          
+      - identifier: "generate_weekly_report"
+        unified_job_template: "Generate Weekly Report"
+        inventory: "localhost"
+        limit: "localhost"
+        success_nodes:
+          - "distribute_report"
+        extra_data:
+          report_type: "weekly"
+          include_trends: true
+          
+      - identifier: "distribute_report"
+        unified_job_template: "Distribute Reports"
+        inventory: "localhost"
+        limit: "localhost"
+        credentials:
+          - "SMTP Credential"
+        extra_data:
+          distribution_list: "weekly_reports"
+          
+      - identifier: "archive_reports"
+        unified_job_template: "Archive Reports"
+        inventory: "localhost"
+        limit: "localhost"
+        always_nodes: []
+        extra_data:
+          archive_location: "/archive/weekly_reports/"
