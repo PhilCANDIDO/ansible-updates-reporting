@@ -48,14 +48,12 @@ def debian_parse_updates(package_lines):
                     version_current = current_part.split(']')[0].strip()
                 
                 # Détection renforcée des mises à jour de sécurité
-                line_lower = line.lower()
                 repository_lower = repository.lower()
                 
                 is_security = any([
-                    'security' in line_lower,
-                    'security-updates' in line_lower,
                     '-security' in repository_lower,
                     '/security' in repository_lower,
+                    'security-updates' in repository_lower,
                     'stable-security' in repository_lower,
                     'oldstable-security' in repository_lower,
                     'testing-security' in repository_lower,
@@ -268,7 +266,10 @@ def suse_parse_updates(package_lines):
                 current_version = parts[1] if len(parts) > 1 else 'installed'
                 available_version = parts[2] if len(parts) > 2 else 'unknown'
                 
-                is_security = 'security' in line.lower() or 'patch' in line.lower()
+                # For SUSE, security updates typically come from specific repos
+                # Since we don't have repository info in the line format, default to false
+                # This should be enhanced by the enhance_security_detection function
+                is_security = False
                 
                 packages.append({
                     'name': package_name,
