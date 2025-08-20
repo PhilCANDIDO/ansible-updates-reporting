@@ -35,13 +35,22 @@
   run_once: true
   tags: [aggregation, initialization]
 
-- name: "(aggregate_data) Process each host data"
+- name: "(aggregate_data) Process each reachable host data"
   include_tasks: process_host_data.yml
-  loop: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) }}"
+  loop: "{{ reachable_hosts | default([]) }}"
   loop_control:
     loop_var: target_host
   run_once: true
   tags: [aggregation, processing]
+
+- name: "(aggregate_data) Add unreachable hosts to errors"
+  set_fact:
+    aggregated_data: "{{ aggregated_data | combine({
+      'errors': aggregated_data.errors + unreachable_details | default([])
+    }) }}"
+  run_once: true
+  when: unreachable_hosts | default([]) | length > 0
+  tags: [aggregation, unreachable]
 
 - name: "(aggregate_data) Calculate final summary statistics"
   set_fact:

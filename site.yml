@@ -46,35 +46,8 @@
 
     - name: "(connectivity) Set host connectivity status"
       set_fact:
-        host_reachable: "{{ ping_result is succeeded }}"
-        connectivity_error: "{{ ping_result.msg | default('Host unreachable') if ping_result is failed else '' }}"
-      delegate_to: ansible
-      delegate_facts: true
-
-    - name: "(connectivity) Build connectivity report for this host"
-      set_fact:
-        connectivity_status:
-          hostname: "{{ inventory_hostname }}"
-          reachable: "{{ ping_result is succeeded }}"
-          error: "{{ ping_result.msg | default('') if ping_result is failed else '' }}"
-          timestamp: "{{ lookup('pipe', 'date -Iseconds') }}"
-      delegate_to: ansible
-      delegate_facts: false
-
-    - name: "(connectivity) Add to appropriate host list"
-      set_fact:
-        reachable_hosts: "{{ (hostvars['ansible']['reachable_hosts'] | default([])) + [inventory_hostname] }}"
-      delegate_to: ansible
-      delegate_facts: true
-      when: ping_result is succeeded
-
-    - name: "(connectivity) Add to unreachable host list"
-      set_fact:
-        unreachable_hosts: "{{ (hostvars['ansible']['unreachable_hosts'] | default([])) + [inventory_hostname] }}"
-        unreachable_details: "{{ (hostvars['ansible']['unreachable_details'] | default([])) + [{'hostname': inventory_hostname, 'error': ping_result.msg | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}] }}"
-      delegate_to: ansible
-      delegate_facts: true
-      when: ping_result is failed
+        host_is_reachable: "{{ ping_result is succeeded }}"
+        host_connectivity_error: "{{ ping_result.msg | default('Host unreachable') if ping_result is failed else '' }}"
 
     - name: "(connectivity) Create report for unreachable host"
       copy:
@@ -99,17 +72,43 @@
       when: ping_result is failed
       ignore_errors: yes
 
+- name: "Consolidate Connectivity Results"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/ansible-updates-reporting.yml
+  tasks:
+    - name: "(connectivity) Build lists of reachable and unreachable hosts"
+      set_fact:
+        reachable_hosts: "{% set reach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
+        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(true) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
+
+    - name: "(connectivity) Save connectivity results"
+      set_fact:
+        connectivity_results:
+          reachable_hosts: "{{ reachable_hosts }}"
+          unreachable_hosts: "{{ unreachable_hosts }}"
+          unreachable_details: "{% set details = [] %}{% for host in unreachable_hosts %}{% set _ = details.append({'hostname': host, 'error': hostvars[host]['host_connectivity_error'] | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}) %}{% endfor %}{{ details }}"
+      delegate_to: localhost
+      run_once: true
+
 - name: "Display Connectivity Summary"
   hosts: ansible
   gather_facts: false
   vars_files:
     - vars/ansible-updates-reporting.yml
   tasks:
+    - name: "(connectivity) Get connectivity results"
+      set_fact:
+        reachable_hosts: "{{ hostvars['localhost']['connectivity_results']['reachable_hosts'] }}"
+        unreachable_hosts: "{{ hostvars['localhost']['connectivity_results']['unreachable_hosts'] }}"
+        unreachable_details: "{{ hostvars['localhost']['connectivity_results']['unreachable_details'] }}"
+
     - name: "(connectivity) Calculate connectivity statistics"
       set_fact:
-        total_target_hosts: "{{ groups['all'] | difference(['repository_managers', 'localhost', 'ansible']) | flatten | unique | length }}"
-        total_reachable: "{{ reachable_hosts | default([]) | length }}"
-        total_unreachable: "{{ unreachable_hosts | default([]) | length }}"
+        total_target_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
+        total_reachable: "{{ reachable_hosts | length }}"
+        total_unreachable: "{{ unreachable_hosts | length }}"
 
     - name: "(connectivity) Display connectivity summary"
       debug:
@@ -123,7 +122,7 @@
           
           {% if total_unreachable | int > 0 %}
           Unreachable Hosts:
-          {% for host in unreachable_hosts | default([]) %}
+          {% for host in unreachable_hosts %}
           - {{ host }}
           {% endfor %}
           {% endif %}
@@ -163,7 +162,7 @@
     execution_id: "{{ hostvars['ansible']['execution_id'] }}"
     execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
-    reachable_hosts: "{{ hostvars['ansible']['reachable_hosts'] | default([]) }}"
+    reachable_hosts: "{{ hostvars['localhost']['connectivity_results']['reachable_hosts'] | default([]) }}"
     # Transmettre l'information aux rôles
     repository_enabled: "{{ use_repository_manager | default(false) }}"
   tasks:
@@ -221,9 +220,9 @@
     execution_timestamp: "{{ hostvars['ansible']['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars['ansible']['use_repository_manager'] }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
-    reachable_hosts: "{{ hostvars['ansible']['reachable_hosts'] | default([]) }}"
-    unreachable_hosts: "{{ hostvars['ansible']['unreachable_hosts'] | default([]) }}"
-    unreachable_details: "{{ hostvars['ansible']['unreachable_details'] | default([]) }}"
+    reachable_hosts: "{{ hostvars['localhost']['connectivity_results']['reachable_hosts'] | default([]) }}"
+    unreachable_hosts: "{{ hostvars['localhost']['connectivity_results']['unreachable_hosts'] | default([]) }}"
+    unreachable_details: "{{ hostvars['localhost']['connectivity_results']['unreachable_details'] | default([]) }}"
   tasks:
     - name: "(report_generation) Execute report generator role"
       include_role:
