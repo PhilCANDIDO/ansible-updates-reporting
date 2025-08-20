@@ -1,20 +1,20 @@
 ---
 # Common ansible options
-ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30'
-ansible_user: "deploy"
-ansible_become: true
-ansible_become_method: sudo
-ansible_become_user: root
+# ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30'
+# ansible_user: "deploy"
+# ansible_become: true
+# ansible_become_method: sudo
+# ansible_become_user: root
 
 # Timeout settings
-ansible_timeout: 30
-ansible_ssh_timeout: 10
+# ansible_timeout: 30
+# ansible_ssh_timeout: 10
 
 # Python interpreter (adjust if needed)
 # ansible_python_interpreter: "{{ ansible_python.executable | default('/usr/bin/python3') }}"
 
 # Force Python 3 interpreter
-ansible_python_interpreter: auto_legacy_silent
+# ansible_python_interpreter: auto_legacy_silent
 
 # Ensure Python 3 is used on all hosts
-interpreter_python: auto_legacy_silent
+# interpreter_python: auto_legacy_silent
