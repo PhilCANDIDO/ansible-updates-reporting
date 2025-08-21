@@ -21,6 +21,23 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
+        .breadcrumb {
+            padding: 10px 20px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
+        .breadcrumb a {
+            color: #e74c3c;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb span {
+            margin: 0 10px;
+            color: #999;
+        }
         .header {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
@@ -177,6 +194,13 @@
 </head>
 <body>
     <div class="container">
+        <!-- Breadcrumb Navigation -->
+        <div class="breadcrumb">
+            <a href="index.html">📊 Main Dashboard</a>
+            <span>›</span>
+            <strong>Errors Report</strong>
+        </div>
+        
         <!-- Header -->
         <div class="header">
             <h1>⚠️ Collection Errors Report</h1>
