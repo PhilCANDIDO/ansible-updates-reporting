@@ -90,8 +90,8 @@
   tasks:
     - name: "(connectivity) Build lists of reachable and unreachable hosts"
       set_fact:
-        reachable_hosts: "{% set reach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
-        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
+        reachable_hosts: "{% set reach = [] %}{% for host in groups['linux_vms'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
+        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['linux_vms'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
 
     - name: "(connectivity) Save connectivity results"
       set_fact:
@@ -116,7 +116,7 @@
 
     - name: "(connectivity) Calculate connectivity statistics"
       set_fact:
-        total_target_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
+        total_target_hosts: "{{ groups['linux_vms'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
         total_reachable: "{{ reachable_hosts | length }}"
         total_unreachable: "{{ unreachable_hosts | length }}"
 
