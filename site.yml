@@ -257,6 +257,7 @@
     execution_timestamp: "{{ hostvars[groups['ansible'][0]]['execution_timestamp'] }}"
     use_repository_manager: "{{ hostvars[groups['ansible'][0]]['use_repository_manager'] }}"
     repository_enabled: "{{ use_repository_manager | default(false) }}"
+    all_checked_hosts: "{{ hostvars[groups['ansible'][0]]['all_checked_hosts'] | default([]) }}"
     reachable_hosts: "{{ hostvars[groups['ansible'][0]]['connectivity_results']['reachable_hosts'] | default([]) }}"
     unreachable_hosts: "{{ hostvars[groups['ansible'][0]]['connectivity_results']['unreachable_hosts'] | default([]) }}"
     unreachable_details: "{{ hostvars[groups['ansible'][0]]['connectivity_results']['unreachable_details'] | default([]) }}"

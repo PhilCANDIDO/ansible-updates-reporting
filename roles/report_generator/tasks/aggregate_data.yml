@@ -17,7 +17,7 @@
   set_fact:
     aggregated_data:
       summary:
-        total_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
+        total_hosts: "{{ all_checked_hosts | default([]) | difference(groups['repository_managers'] | default([])) | difference(['localhost']) | length }}"
         reachable_hosts: "{{ reachable_hosts | default([]) | length }}"
         unreachable_hosts: "{{ unreachable_hosts | default([]) | length }}"
         total_updates: 0
