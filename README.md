@@ -24,7 +24,7 @@ A comprehensive Ansible-based system for collecting, processing, and reporting p
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/ansible-updates-reporting.git
+git clone https://github.com/PhilCANDIDO/ansible-updates-reporting.git
 cd ansible-updates-reporting
 ```
 
@@ -242,6 +242,12 @@ Run integration tests:
 4. Add tests for new functionality
 5. Submit a pull request
 
+## Author
+
+**Philippe Candido**  
+Email: philippe.candido@emerging-it.fr  
+Company: Emerging IT
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -249,8 +255,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For issues and questions:
+- Email: support@emerging-it.fr
 - Open an issue on GitHub
-- Check the CLAUDE.md file for development guidelines
 - Review existing issues for solutions
 
 ## Acknowledgments
@@ -258,3 +264,4 @@ For issues and questions:
 - Built with Ansible
 - Optimized for AWX/Tower environments
 - Designed for enterprise-scale deployments
+- Developed by Emerging IT
