@@ -18,12 +18,14 @@
   setup:
     gather_subset: "!all,!min,distribution"
   delegate_to: localhost
+  delegate_facts: true
   run_once: true
+  register: localhost_facts
   tags: [generation, excel, dependencies, os_detection]
 
 - name: "(generate_excel) Display control node OS info"
   debug:
-    msg: "Control node OS: {{ hostvars['localhost']['ansible_distribution'] }} {{ hostvars['localhost']['ansible_distribution_version'] }}"
+    msg: "Control node OS: {{ localhost_facts.ansible_facts.ansible_distribution | default('Unknown') }} {{ localhost_facts.ansible_facts.ansible_distribution_version | default('Unknown') }}"
   delegate_to: localhost
   run_once: true
   tags: [generation, excel, dependencies, info]
@@ -33,7 +35,7 @@
   delegate_to: localhost
   run_once: true
   become: true
-  when: hostvars['localhost']['ansible_os_family'] == 'Debian'
+  when: localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
   ignore_errors: true
   tags: [generation, excel, dependencies, fix]
 
@@ -44,7 +46,7 @@
   delegate_to: localhost
   run_once: true
   become: true
-  when: hostvars['localhost']['ansible_os_family'] == 'Debian'
+  when: localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
   tags: [generation, excel, dependencies, update]
 
 - name: "(generate_excel) Check if openpyxl is already installed"
@@ -99,7 +101,7 @@
   run_once: true
   become: true
   when: 
-    - hostvars['localhost']['ansible_os_family'] == 'Debian'
+    - localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
   register: system_package_install_debian
   tags: [generation, excel, dependencies, install]
@@ -117,7 +119,7 @@
   run_once: true
   become: true
   when: 
-    - hostvars['localhost']['ansible_os_family'] == 'RedHat'
+    - localhost_facts.ansible_facts.ansible_os_family | default('') == 'RedHat'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
   register: system_package_install_redhat
   ignore_errors: true
@@ -135,7 +137,7 @@
   run_once: true
   become: true
   when: 
-    - hostvars['localhost']['ansible_os_family'] == 'RedHat'
+    - localhost_facts.ansible_facts.ansible_os_family | default('') == 'RedHat'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
     - system_package_install_redhat is defined
     - system_package_install_redhat.failed
@@ -155,7 +157,7 @@
   run_once: true
   become: true
   when: 
-    - hostvars['localhost']['ansible_os_family'] == 'Debian'
+    - localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
     - system_package_install_debian is defined
     - system_package_install_debian.failed
