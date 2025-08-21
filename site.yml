@@ -164,7 +164,7 @@
 
 - name: "Collect Updates Information"
   hosts: all:!repository_managers:!localhost:!ansible
-  gather_facts: true
+  gather_facts: false
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars_files:
     - vars/ansible-updates-reporting.yml
@@ -179,6 +179,10 @@
     - name: "(updates_collection) Skip unreachable hosts"
       meta: end_host
       when: inventory_hostname not in reachable_hosts
+    
+    - name: "(updates_collection) Gather facts for reachable hosts"
+      setup:
+      when: inventory_hostname in reachable_hosts
 
     - name: "(updates_collection) Execute updates collector role"
       block:
