@@ -34,7 +34,7 @@
   command: dpkg --configure -a
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
   ignore_errors: true
   tags: [generation, excel, dependencies, fix]
@@ -45,7 +45,7 @@
     cache_valid_time: 3600
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
   tags: [generation, excel, dependencies, update]
 
@@ -99,7 +99,7 @@
     state: present
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: 
     - localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
@@ -115,9 +115,10 @@
       - lapack
       - blas
     state: present
+    use_backend: auto
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: 
     - localhost_facts.ansible_facts.ansible_os_family | default('') == 'RedHat'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
@@ -133,9 +134,10 @@
       - numpy>=1.21.0
     state: present
     executable: pip3
+    extra_args: "--user"
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: 
     - localhost_facts.ansible_facts.ansible_os_family | default('') == 'RedHat'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
@@ -155,7 +157,7 @@
     extra_args: "--break-system-packages"
   delegate_to: localhost
   run_once: true
-  become: true
+  become: false
   when: 
     - localhost_facts.ansible_facts.ansible_os_family | default('') == 'Debian'
     - (openpyxl_check.rc != 0 or pandas_check.rc != 0 or numpy_check.rc != 0)
