@@ -46,8 +46,18 @@
 
     - name: "(connectivity) Set host connectivity status"
       set_fact:
-        host_is_reachable: "{{ ping_result is succeeded }}"
-        host_connectivity_error: "{{ ping_result.msg | default('Host unreachable') if ping_result is failed else '' }}"
+        host_is_reachable: "{{ ping_result.ping is defined and ping_result.ping == 'pong' }}"
+        host_connectivity_error: "{{ ping_result.msg | default('Host unreachable') if ping_result.ping is not defined else '' }}"
+    
+    - name: "(connectivity) Debug ping result for {{ inventory_hostname }}"
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Ping succeeded: {{ ping_result.ping is defined }}
+          Unreachable: {{ ping_result.unreachable | default(false) }}
+          Failed: {{ ping_result is failed }}
+          Is reachable: {{ host_is_reachable }}
+        verbosity: 2
 
     - name: "(connectivity) Create report for unreachable host"
       copy:
@@ -69,7 +79,7 @@
         mode: '0644'
       delegate_to: localhost
       become: false
-      when: ping_result is failed
+      when: not host_is_reachable
       ignore_errors: yes
 
 - name: "Consolidate Connectivity Results"
@@ -81,7 +91,7 @@
     - name: "(connectivity) Build lists of reachable and unreachable hosts"
       set_fact:
         reachable_hosts: "{% set reach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
-        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(true) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
+        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
 
     - name: "(connectivity) Save connectivity results"
       set_fact:
