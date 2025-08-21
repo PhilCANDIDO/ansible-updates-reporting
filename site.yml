@@ -30,7 +30,7 @@
       tags: [always, variables]
 
 - name: "Pre-flight Connectivity Check"
-  hosts: all:!repository_managers:!localhost:!ansible
+  hosts: linux_vms:!repository_managers:!localhost:!ansible
   gather_facts: false
   vars_files:
     - vars/ansible-updates-reporting.yml
@@ -163,7 +163,7 @@
       tags: [repository, api]
 
 - name: "Collect Updates Information"
-  hosts: all:!repository_managers:!localhost:!ansible
+  hosts: linux_vms:!repository_managers:!localhost:!ansible
   gather_facts: false
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars_files:
