@@ -98,7 +98,7 @@
         connectivity_results:
           reachable_hosts: "{{ reachable_hosts }}"
           unreachable_hosts: "{{ unreachable_hosts }}"
-          unreachable_details: "{% set details = [] %}{% for host in unreachable_hosts %}{% set _ = details.append({'hostname': host, 'error': hostvars[host]['host_connectivity_error'] | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}) %}{% endfor %}{{ details }}"
+          unreachable_details: "{% set details = [] %}{% for host in unreachable_hosts %}{% set _ = details.append({'hostname': host, 'error_type': 'unreachable', 'error_message': hostvars[host]['host_connectivity_error'] | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}) %}{% endfor %}{{ details }}"
       delegate_to: localhost
       run_once: true
 
