@@ -1,5 +1,5 @@
 ---
-- name: "(aggregate_data) Collect facts from all hosts"
+- name: "(aggregate_data) Collect facts from reachable hosts"
   setup:
     gather_subset:
       - "!all"
@@ -8,8 +8,9 @@
       - "hardware"
   delegate_to: "{{ item }}"
   delegate_facts: true
-  loop: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) }}"
+  loop: "{{ reachable_hosts | default([]) }}"
   ignore_errors: true
+  when: reachable_hosts is defined and reachable_hosts | length > 0
   tags: [aggregation, facts]
 
 - name: "(aggregate_data) Aggregate host data with error handling"
