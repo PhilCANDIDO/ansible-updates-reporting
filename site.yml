@@ -59,6 +59,17 @@
           Is reachable: {{ host_is_reachable }}
         verbosity: 2
 
+    - name: "(connectivity) Ensure reports directory exists"
+      file:
+        path: "{{ lookup('env', 'AWX_ARTIFACTS_DIR', default='/tmp/ansible-reports') }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
+      when: not host_is_reachable
+      run_once: true
+      ignore_errors: yes
+
     - name: "(connectivity) Create report for unreachable host"
       copy:
         content: |
@@ -75,7 +86,7 @@
               "status": "unreachable"
             }
           }
-        dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
+        dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR', default='/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
         mode: '0644'
       delegate_to: localhost
       become: false
@@ -83,24 +94,25 @@
       ignore_errors: yes
 
 - name: "Consolidate Connectivity Results"
-  hosts: localhost
+  hosts: all
   gather_facts: false
+  run_once: true
   vars_files:
     - vars/ansible-updates-reporting.yml
   tasks:
     - name: "(connectivity) Build lists of reachable and unreachable hosts"
+      delegate_to: localhost
       set_fact:
-        reachable_hosts: "{% set reach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
-        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) %}{% if not hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
+        reachable_hosts: "{% set reach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost']) %}{% if hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = reach.append(host) %}{% endif %}{% endfor %}{{ reach }}"
+        unreachable_hosts: "{% set unreach = [] %}{% for host in groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost']) %}{% if not hostvars[host]['host_is_reachable'] | default(false) %}{% set _ = unreach.append(host) %}{% endif %}{% endfor %}{{ unreach }}"
 
     - name: "(connectivity) Save connectivity results"
+      delegate_to: localhost
       set_fact:
         connectivity_results:
           reachable_hosts: "{{ reachable_hosts }}"
           unreachable_hosts: "{{ unreachable_hosts }}"
           unreachable_details: "{% set details = [] %}{% for host in unreachable_hosts %}{% set _ = details.append({'hostname': host, 'error_type': 'unreachable', 'error_message': hostvars[host]['host_connectivity_error'] | default('Connection failed'), 'timestamp': lookup('pipe', 'date -Iseconds')}) %}{% endfor %}{{ details }}"
-      delegate_to: localhost
-      run_once: true
 
 - name: "Display Connectivity Summary"
   hosts: ansible
@@ -116,7 +128,7 @@
 
     - name: "(connectivity) Calculate connectivity statistics"
       set_fact:
-        total_target_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost', 'ansible']) | length }}"
+        total_target_hosts: "{{ groups['all'] | difference(groups['repository_managers'] | default([])) | difference(['localhost']) | length }}"
         total_reachable: "{{ reachable_hosts | length }}"
         total_unreachable: "{{ unreachable_hosts | length }}"
 
@@ -163,7 +175,7 @@
       tags: [repository, api]
 
 - name: "Collect Updates Information"
-  hosts: all:!repository_managers:!localhost:!ansible
+  hosts: all:!repository_managers:!localhost
   gather_facts: false
   serial: "{{ updates_collection_serial | default('100%') }}"
   vars_files:
@@ -199,6 +211,15 @@
           set_fact:
             host_collection_status: "failed"
             collection_error: "{{ ansible_failed_result.msg | default('Collection failed') }}"
+        
+        - name: "(updates_collection) Ensure reports directory exists for failed host"
+          file:
+            path: "{{ lookup('env', 'AWX_ARTIFACTS_DIR', default='/tmp/ansible-reports') }}"
+            state: directory
+            mode: '0755'
+          delegate_to: localhost
+          become: false
+          ignore_errors: yes
             
         - name: "(updates_collection) Create error report for failed host"
           copy:
@@ -216,7 +237,7 @@
                   "status": "collection_failed"
                 }
               }
-            dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR') | default('/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
+            dest: "{{ lookup('env', 'AWX_ARTIFACTS_DIR', default='/tmp/ansible-reports') }}/{{ inventory_hostname }}.json"
             mode: '0644'
           delegate_to: localhost
           become: false
